@@ -1,7 +1,20 @@
 import './style.css';
-import { FINISHES, FINISH_ORDER, SHADES, type FinishId, type Shade } from './shades';
+import {
+  CATEGORIES,
+  CATEGORY_ORDER,
+  PRESETS,
+  applyPreset,
+  defaultLook,
+  presetColors,
+  productOf,
+  sanitizeLook,
+  clearedLook,
+  type CategoryId,
+  type Look,
+} from './catalog';
+import { FaceSmoother, toPoints, type FacePts } from './face';
+import { renderLook } from './makeup';
 import { createTracker, type Tracker } from './tracker';
-import { LipRenderer, LipSmoother, toPoints, type LipPts } from './lips';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -13,33 +26,37 @@ const intro = $('intro');
 const introError = $('intro-error');
 const fileInput = $<HTMLInputElement>('file');
 
-// ---------- settings ----------
-interface Settings {
-  shadeId: string;
-  finish: FinishId;
-  intensity: number; // 0..100
-}
-const STORE_KEY = 'lipstick-tryon:v1';
-const settings: Settings = { shadeId: 'classic-red', finish: 'satin', intensity: 80 };
+// ---------- look & settings ----------
+type Tab = CategoryId | 'looks';
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'looks', label: 'Looks' },
+  ...CATEGORY_ORDER.map((id) => ({ id: id as Tab, label: CATEGORIES[id].label })),
+];
+const STORE_KEY = 'makeup-tryon:v2';
+const OLD_STORE_KEY = 'lipstick-tryon:v1';
+
+let look: Look = defaultLook();
+let tab: Tab = 'lips';
 try {
-  const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as Partial<Settings> | null;
+  const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as { look?: unknown; tab?: string } | null;
   if (saved) {
-    if (SHADES.some((s) => s.id === saved.shadeId)) settings.shadeId = saved.shadeId!;
-    if (saved.finish && saved.finish in FINISHES) settings.finish = saved.finish;
-    if (typeof saved.intensity === 'number') settings.intensity = Math.min(100, Math.max(0, saved.intensity));
+    look = sanitizeLook(saved.look);
+    if (TABS.some((t) => t.id === saved.tab)) tab = saved.tab as Tab;
+  } else {
+    // carry over the lipstick choice from the first version of the app
+    const old = JSON.parse(localStorage.getItem(OLD_STORE_KEY) ?? 'null') as { shadeId?: string; finish?: string; intensity?: number } | null;
+    if (old) look = sanitizeLook({ lips: { productId: old.shadeId, finish: old.finish, intensity: old.intensity } });
   }
 } catch {
   /* storage unavailable (private mode) – defaults are fine */
 }
 function persist() {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(settings));
+    localStorage.setItem(STORE_KEY, JSON.stringify({ look, tab }));
   } catch {
     /* ignore */
   }
 }
-
-const currentShade = (): Shade => SHADES.find((s) => s.id === settings.shadeId) ?? SHADES[0];
 
 // ---------- app state ----------
 type Mode = 'idle' | 'camera' | 'photo';
@@ -60,82 +77,183 @@ const trackerReady = createTracker()
     return null;
   });
 
-const renderer = new LipRenderer();
-const smoother = new LipSmoother();
-let livePts: LipPts | null = null;
+const smoother = new FaceSmoother();
+let livePts: FacePts | null = null;
 let lastFaceAt = 0;
 let lastVideoTime = -1;
 let comparing = false;
-let photo: { canvas: HTMLCanvasElement; pts: LipPts | null } | null = null;
+let photo: { canvas: HTMLCanvasElement; pts: FacePts | null } | null = null;
 let photoDirty = true;
 
-// ---------- UI: shades / finishes / intensity ----------
+// ---------- UI ----------
+const tabsEl = $('tabs');
 const swatchesEl = $('swatches');
 const finishesEl = $('finishes');
+const controlsEl = $('controls');
 const intensityEl = $<HTMLInputElement>('intensity');
+const NONE = '__none';
 
-function buildSwatches() {
-  for (const shade of SHADES) {
+function buildTabs() {
+  for (const t of TABS) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'swatch';
-    b.dataset.id = shade.id;
-    b.style.background = shade.hex;
-    b.setAttribute('role', 'radio');
-    b.setAttribute('aria-label', `${shade.name}, ${shade.family}`);
-    b.addEventListener('click', () => selectShade(shade.id));
-    swatchesEl.appendChild(b);
+    b.className = 'tab';
+    b.dataset.id = t.id;
+    b.setAttribute('role', 'tab');
+    b.innerHTML = `<i class="dot"></i><span></span>`;
+    b.querySelector('span')!.textContent = t.label;
+    b.addEventListener('click', () => {
+      tab = t.id;
+      persist();
+      renderPanel();
+    });
+    tabsEl.appendChild(b);
   }
 }
 
-function buildFinishes() {
-  for (const id of FINISH_ORDER) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.dataset.id = id;
-    b.textContent = FINISHES[id].label;
-    b.setAttribute('role', 'radio');
-    b.addEventListener('click', () => selectFinish(id));
-    finishesEl.appendChild(b);
+const noneSvg =
+  '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg>';
+
+function renderPanel() {
+  swatchesEl.textContent = '';
+  finishesEl.textContent = '';
+  swatchesEl.scrollLeft = 0;
+
+  if (tab === 'looks') {
+    swatchesEl.className = 'swatches presets';
+    swatchesEl.setAttribute('role', 'group');
+    swatchesEl.setAttribute('aria-label', 'Ready-made looks');
+    controlsEl.hidden = true;
+
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'preset';
+    clear.dataset.id = NONE;
+    clear.innerHTML = `<span class="chip none">${noneSvg}</span><span class="name">Clear all</span>`;
+    clear.addEventListener('click', () => setLook(clearedLook()));
+    swatchesEl.appendChild(clear);
+
+    for (const preset of PRESETS) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'preset';
+      b.dataset.id = preset.id;
+      const dots = presetColors(preset)
+        .map((hex) => `<i style="background:${hex}"></i>`)
+        .join('');
+      b.innerHTML = `<span class="chip">${dots}</span><span class="name"></span>`;
+      b.querySelector('.name')!.textContent = preset.name;
+      b.addEventListener('click', () => setLook(applyPreset(preset)));
+      swatchesEl.appendChild(b);
+    }
+  } else {
+    const cat = CATEGORIES[tab];
+    swatchesEl.className = 'swatches';
+    swatchesEl.setAttribute('role', 'radiogroup');
+    swatchesEl.setAttribute('aria-label', `${cat.label} shade`);
+    controlsEl.hidden = false;
+
+    const none = document.createElement('button');
+    none.type = 'button';
+    none.className = 'swatch none';
+    none.dataset.id = NONE;
+    none.setAttribute('role', 'radio');
+    none.setAttribute('aria-label', `No ${cat.label.toLowerCase()}`);
+    none.innerHTML = noneSvg;
+    none.addEventListener('click', () => selectProduct(null));
+    swatchesEl.appendChild(none);
+
+    for (const product of cat.products) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch';
+      b.dataset.id = product.id;
+      b.style.background = product.hex;
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-label', `${product.name}, ${product.family}`);
+      b.addEventListener('click', () => selectProduct(product.id));
+      swatchesEl.appendChild(b);
+    }
+
+    finishesEl.hidden = cat.finishes.length < 2;
+    finishesEl.style.setProperty('--n', String(cat.finishes.length));
+    for (const f of cat.finishes) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.id = f.id;
+      b.textContent = f.label;
+      b.setAttribute('role', 'radio');
+      b.addEventListener('click', () => {
+        look[tab as CategoryId].finish = f.id;
+        persist();
+        syncUI();
+      });
+      finishesEl.appendChild(b);
+    }
   }
+  syncUI(true);
 }
 
 function syncUI(scroll = false) {
-  const shade = currentShade();
-  $('shade-name').textContent = shade.name;
-  $('shade-family').textContent = shade.family;
-  document.documentElement.style.setProperty('--accent', shade.hex);
-  for (const el of swatchesEl.children) {
-    const on = (el as HTMLElement).dataset.id === shade.id;
-    el.setAttribute('aria-checked', String(on));
-    if (on && scroll) (el as HTMLElement).scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  for (const el of tabsEl.children as Iterable<HTMLElement>) {
+    const id = el.dataset.id as Tab;
+    el.setAttribute('aria-selected', String(id === tab));
+    const dot = el.querySelector<HTMLElement>('.dot')!;
+    const product = id === 'looks' ? undefined : productOf(id, look[id]);
+    dot.style.background = product?.hex ?? '';
+    dot.classList.toggle('on', !!product);
   }
-  for (const el of finishesEl.children) {
-    el.setAttribute('aria-checked', String((el as HTMLElement).dataset.id === settings.finish));
+
+  let accent = productOf('lips', look.lips)?.hex ?? '#c8102e';
+  if (tab === 'looks') {
+    $('shade-name').textContent = 'Looks';
+    $('shade-family').textContent = 'Full-face looks in one tap';
+  } else {
+    const cat = CATEGORIES[tab];
+    const layer = look[tab];
+    const product = productOf(tab, layer);
+    if (product) accent = product.hex;
+    $('shade-name').textContent = product ? product.name : `No ${cat.label.toLowerCase()}`;
+    $('shade-family').textContent = product ? product.family : 'Tap a shade to try it on';
+    for (const el of swatchesEl.children as Iterable<HTMLElement>) {
+      const on = el.dataset.id === (product ? product.id : NONE);
+      el.setAttribute('aria-checked', String(on));
+      if (on && scroll) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    }
+    for (const el of finishesEl.children as Iterable<HTMLElement>) {
+      el.setAttribute('aria-checked', String(el.dataset.id === layer.finish));
+    }
+    intensityEl.value = String(layer.intensity);
+    intensityEl.disabled = !product;
+    controlsEl.classList.toggle('disabled', !product);
   }
-  intensityEl.value = String(settings.intensity);
+  document.documentElement.style.setProperty('--accent', accent);
   photoDirty = true;
 }
 
-function selectShade(id: string) {
-  settings.shadeId = id;
+function selectProduct(id: string | null) {
+  const layer = look[tab as CategoryId];
+  layer.productId = id;
+  if (id && layer.intensity === 0) layer.intensity = 60;
   persist();
   syncUI(true);
 }
-function selectFinish(id: FinishId) {
-  settings.finish = id;
+
+function setLook(next: Look) {
+  look = next;
   persist();
   syncUI();
 }
+
 intensityEl.addEventListener('input', () => {
-  settings.intensity = Number(intensityEl.value);
+  if (tab === 'looks') return;
+  look[tab].intensity = Number(intensityEl.value);
   persist();
   photoDirty = true;
 });
 
-buildSwatches();
-buildFinishes();
-syncUI(true);
+buildTabs();
+renderPanel();
 
 // ---------- status pill ----------
 let statusText = '';
@@ -279,7 +397,7 @@ $('btn-mode').addEventListener('click', () => {
   else fileInput.click();
 });
 
-// ---------- compare (hold to see bare lips) ----------
+// ---------- compare (hold to see your bare face) ----------
 const compareBtn = $('btn-compare');
 const setCompare = (on: boolean) => {
   comparing = on;
@@ -303,11 +421,12 @@ function fitCanvas(w: number, h: number) {
   }
 }
 
-function drawLips(w: number, h: number, pts: LipPts | null) {
+function drawMakeup(w: number, h: number, pts: FacePts | null, now: number) {
   if (!pts || comparing) return;
-  const shade = currentShade();
-  renderer.render(ctx, w, h, pts, { hex: shade.hex, finish: settings.finish, intensity: settings.intensity / 100 });
+  renderLook(ctx, w, h, pts, look, now);
 }
+
+const sparkling = () => !!look.eyes.productId && look.eyes.finish === 'shimmer';
 
 function frame(now: number) {
   requestAnimationFrame(frame);
@@ -330,18 +449,18 @@ function frame(now: number) {
         smoother.reset();
       }
     }
-    drawLips(w, h, livePts);
+    drawMakeup(w, h, livePts, now);
 
     if (trackerFailed) setStatus('Face tracking could not load. Check your connection and reload.');
     else if (!tracker) setStatus('Loading face tracking…');
     else if (!livePts && now - lastFaceAt > 700) setStatus('Move your face into the frame');
     else setStatus('');
-  } else if (mode === 'photo' && photo && photoDirty) {
+  } else if (mode === 'photo' && photo && (photoDirty || sparkling())) {
     photoDirty = false;
     const { canvas, pts } = photo;
     fitCanvas(canvas.width, canvas.height);
     ctx.drawImage(canvas, 0, 0);
-    drawLips(canvas.width, canvas.height, pts);
+    drawMakeup(canvas.width, canvas.height, pts, now);
   }
 }
 requestAnimationFrame(frame);
@@ -386,11 +505,11 @@ async function capture() {
 
 async function shareResult() {
   if (!resultBlob) return;
-  const name = `${currentShade().id}-lipstick.jpg`;
+  const name = 'makeup-look.jpg';
   const file = new File([resultBlob], name, { type: 'image/jpeg' });
   if (navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: `${currentShade().name} lipstick` });
+      await navigator.share({ files: [file], title: 'My makeup look' });
       return;
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;

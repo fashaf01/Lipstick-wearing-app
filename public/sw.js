@@ -1,7 +1,7 @@
 // Offline cache: network-first for pages, cache-first for everything else
 // (hashed assets, the face model and the WASM runtime never change in place).
-const VERSION = 'v1';
-const CACHE = `lip-tryon-${VERSION}`;
+const VERSION = 'v2';
+const CACHE = `makeup-tryon-${VERSION}`;
 // Dev/preview servers send `Vary: Origin`, which would make pre-cached files miss for module scripts.
 const MATCH = { ignoreVary: true };
 

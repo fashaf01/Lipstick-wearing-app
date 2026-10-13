@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Lipstick Try-On</title>
-    <meta name="description" content="Try on lipstick shades live with your camera." />
+    <title>Makeup Try-On</title>
+    <meta name="description" content="Try on lipstick, eyeshadow, eyeliner, blush and brows live with your camera." />
     <meta name="theme-color" content="#14090f" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Lip Try-On" />
+    <meta name="apple-mobile-web-app-title" content="Makeup Try-On" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
@@ -17,22 +17,23 @@
   <body>
     <div id="app">
       <div class="stage">
-        <canvas id="view" aria-label="Live lipstick try-on preview"></canvas>
+        <canvas id="view" aria-label="Live makeup try-on preview"></canvas>
         <video id="cam" playsinline muted autoplay></video>
         <div id="status" class="pill" role="status" hidden></div>
       </div>
 
       <header class="topbar">
-        <div class="brand">Lipstick <span>Try-On</span></div>
+        <div class="brand">Makeup <span>Try-On</span></div>
         <button id="btn-flip" class="icon-btn" aria-label="Switch camera">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3l1.5-2h9L18 7h3v12H3z"/><path d="M9 13a3 3 0 0 1 5.2-2M15 13a3 3 0 0 1-5.2 2"/><path d="M14.5 9.5v1.8h-1.8M9.5 16.5v-1.8h1.8" /></svg>
         </button>
       </header>
 
-      <section class="sheet" id="sheet" aria-label="Lipstick controls">
+      <section class="sheet" id="sheet" aria-label="Makeup controls">
+        <div class="tabs" id="tabs" role="tablist" aria-label="Makeup type"></div>
         <div class="shade-title"><span id="shade-name"></span><small id="shade-family"></small></div>
-        <div class="swatches" id="swatches" role="radiogroup" aria-label="Lipstick shade"></div>
-        <div class="controls">
+        <div class="swatches" id="swatches" role="radiogroup" aria-label="Shade"></div>
+        <div class="controls" id="controls">
           <div class="segmented" id="finishes" role="radiogroup" aria-label="Finish"></div>
           <label class="intensity">
             <span>Intensity</span>
@@ -59,8 +60,8 @@
             <path d="M96 276C160 300 210 304 256 304C302 304 352 300 416 276C390 360 330 410 256 410C182 410 122 360 96 276Z" fill="#c8102e"/>
             <path d="M190 350C220 366 292 366 322 350" stroke="#fff" stroke-opacity=".55" stroke-width="12" stroke-linecap="round" fill="none"/>
           </svg>
-          <h1>Try lipstick live</h1>
-          <p>Open your camera and watch 18 shades appear on your lips in real time. Pick a finish, take a photo, share it.</p>
+          <h1>Try makeup live</h1>
+          <p>Open your camera and try lipstick, eyeshadow, eyeliner, blush and brows in real time. Pick a ready-made look or build your own, then take a photo and share it.</p>
           <button id="btn-start" class="primary" type="button">Start camera</button>
           <button id="btn-intro-photo" class="link" type="button">or try on a photo</button>
           <p id="intro-error" class="error" role="alert" hidden></p>
@@ -69,7 +70,7 @@
       </div>
 
       <div id="result" class="result" hidden>
-        <img id="result-img" alt="Your lipstick look" />
+        <img id="result-img" alt="Your makeup look" />
         <div class="result-actions">
           <button id="btn-share" class="primary" type="button">Share / Save</button>
           <button id="btn-close" class="ghost" type="button">Close</button>

@@ -1,7 +1,7 @@
 {
-  "name": "Lipstick Try-On",
-  "short_name": "Lip Try-On",
-  "description": "Try on lipstick shades live with your camera.",
+  "name": "Makeup Try-On",
+  "short_name": "Makeup Try-On",
+  "description": "Try on lipstick, eyeshadow, eyeliner, blush and brows live with your camera.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

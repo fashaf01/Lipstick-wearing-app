@@ -1,5 +1,5 @@
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
-import type { Landmark } from './lips';
+import type { Landmark } from './face';
 
 export interface Tracker {
   /** Synchronous detection on the current video frame. */
