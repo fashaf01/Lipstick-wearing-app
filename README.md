@@ -4,6 +4,7 @@ Open the page, allow the camera, and see makeup on your face **live**. Works in 
 iPhone, Android and desktop, and can be added to the iPhone Home Screen so it opens like an app.
 
 - **Live camera try-on** with on-device face tracking (MediaPipe Face Landmarker)
+- **Realistic rendering**: makeup is blended per pixel in linear light, so skin texture, lip lines, lashes and brow hairs show through (it looks like product on skin, not a filter)
 - **Lipstick**: 18 shades, finishes matte / satin / gloss / sheer
 - **Eyeshadow**: 16 shades, finishes matte / shimmer (twinkling sparkles) / smoky
 - **Eyeliner**: 7 colours, thin / classic / winged
@@ -42,16 +43,18 @@ with its own icon.
 | --- | --- |
 | `src/tracker.ts` | Loads the MediaPipe face model (GPU, falls back to CPU) and returns 478 face landmarks per frame |
 | `src/face.ts` | Landmark index sets, geometry helpers, and temporal smoothing |
-| `src/paint.ts` | Shared painter: feathered alpha mask, then colour layer, then blend passes onto the frame |
-| `src/lips.ts`, `eyes.ts`, `cheeks.ts`, `brows.ts` | One renderer per product type |
+| `src/pixels.ts` | Linear-light colour conversion, noise, reference-colour sampling, blur |
+| `src/paint.ts` | Small anti-aliased masks and contour helpers |
+| `src/lips.ts`, `eyes.ts`, `cheeks.ts`, `brows.ts` | One per-pixel renderer per product type |
 | `src/makeup.ts` | Applies a whole look in layer order: blush, brows, eyeshadow, liner, lips |
 | `src/catalog.ts` | All shades, finishes and the one-tap Looks (edit here to add products) |
 | `src/shades.ts` | Lipstick shades and finish recipes |
 | `src/main.ts` | Camera, photo mode, tabbed UI, capture and share |
 | `public/sw.js` | Service worker that caches the app, model and WASM for offline use |
 
-Notes: the open mouth is excluded with an even-odd lip mask so teeth stay natural. Edges are feathered
-with an off-canvas `shadowBlur` trick instead of `ctx.filter`, so it also works on Safari.
+Notes: lip edges follow the real lip/skin colour change near the landmark contour, the open mouth is excluded so
+teeth stay natural, and gloss is lit from the lips' shape. Mask edges use an off-canvas `shadowBlur` trick instead of
+`ctx.filter`, so it also works on Safari. A full look costs about 7 ms per frame on a desktop CPU.
 
 ## Native iOS app
 

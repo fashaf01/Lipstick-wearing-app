@@ -6,16 +6,6 @@ export interface BBox {
   w: number;
   h: number;
 }
-export interface Pass {
-  op: GlobalCompositeOperation;
-  alpha: number;
-}
-type Ctx = CanvasRenderingContext2D;
-
-function newCanvas() {
-  const c = document.createElement('canvas');
-  return { c, x: c.getContext('2d')! };
-}
 
 /** Bounding box of some points, padded and clamped to the frame. */
 export function bboxOf(groups: Pt[][], pad: number, w: number, h: number): BBox | null {
@@ -34,6 +24,8 @@ export function bboxOf(groups: Pt[][], pad: number, w: number, h: number): BBox 
   const bh = Math.min(h, Math.ceil(maxY + pad)) - y;
   return bw > 0 && bh > 0 ? { x, y, w: bw, h: bh } : null;
 }
+
+type Ctx = CanvasRenderingContext2D;
 
 /** Smooth closed curve through the midpoints of the given points. */
 export function traceClosed(c: Ctx, pts: Pt[], dx = 0) {
@@ -60,35 +52,60 @@ export function traceOpen(c: Ctx, pts: Pt[], dx = 0) {
   c.lineTo(last.x + dx, last.y);
 }
 
+/** Moves every vertex of a closed ring along its outward normal by `d` pixels (negative = shrink). */
+export function offsetRing(ring: Pt[], d: number): Pt[] {
+  const n = ring.length;
+  const c = ring.reduce((s, p) => ({ x: s.x + p.x / n, y: s.y + p.y / n }), { x: 0, y: 0 });
+  return ring.map((p, i) => {
+    const a = ring[(i + n - 1) % n];
+    const b = ring[(i + 1) % n];
+    let nx = b.y - a.y;
+    let ny = a.x - b.x;
+    const l = Math.hypot(nx, ny) || 1;
+    nx /= l;
+    ny /= l;
+    if (nx * (p.x - c.x) + ny * (p.y - c.y) < 0) {
+      nx = -nx;
+      ny = -ny;
+    }
+    return { x: p.x + nx * d, y: p.y + ny * d };
+  });
+}
+
+function newMask() {
+  const c = document.createElement('canvas');
+  return { c, x: c.getContext('2d', { willReadFrequently: true })! };
+}
+
 /**
- * Shared two-canvas painter used by every makeup type.
- *
- *  1. `begin` + `feather` build a soft-edged alpha mask of where the product goes.
- *  2. `paint` / `paintCustom` fill a colour layer, clip it to the mask and composite it on the frame.
+ * Builds small anti-aliased alpha masks (where a product may go) that the per-pixel renderers read.
+ * Edges use an off-canvas `shadowBlur` trick so soft edges also work on Safari (no ctx.filter).
  */
 export class Painter {
-  private mask = newCanvas();
-  private layer = newCanvas();
+  private masks = [newMask(), newMask(), newMask()];
+  private dirty: BBox | null = null;
   private w = 0;
 
-  begin(w: number, h: number) {
-    for (const { c } of [this.mask, this.layer]) {
-      if (c.width !== w || c.height !== h) {
-        c.width = w;
-        c.height = h;
+  begin(w: number, h: number, bb: BBox) {
+    for (const m of this.masks) {
+      if (m.c.width !== w || m.c.height !== h) {
+        m.c.width = w;
+        m.c.height = h;
+        this.dirty = null;
+      } else if (this.dirty) {
+        m.x.clearRect(this.dirty.x, this.dirty.y, this.dirty.w, this.dirty.h);
       }
     }
     this.w = w;
-    this.mask.x.clearRect(0, 0, w, h);
+    const pad = 12;
+    const x = Math.max(0, bb.x - pad);
+    const y = Math.max(0, bb.y - pad);
+    this.dirty = { x, y, w: Math.min(w, bb.x + bb.w + pad) - x, h: Math.min(h, bb.y + bb.h + pad) - y };
   }
 
-  /**
-   * Draws a soft-edged shape onto the mask. The shape is drawn far off-canvas and only its blurred
-   * shadow lands in view, which works on every browser (unlike ctx.filter on Safari). `draw` must
-   * build its path using the supplied x offset and call fill()/stroke() itself.
-   */
-  feather(blur: number, draw: (c: Ctx, dx: number) => void, passes = 2) {
-    const c = this.mask.x;
+  /** `draw` builds a path using the supplied x offset and must call fill()/stroke() itself. */
+  feather(which: 0 | 1 | 2, blur: number, draw: (c: Ctx, dx: number) => void, passes = 1) {
+    const c = this.masks[which].x;
     const off = this.w + 400 + blur * 4;
     c.save();
     c.shadowColor = '#000';
@@ -103,54 +120,11 @@ export class Painter {
     c.restore();
   }
 
-  /** Solid colour clipped to the mask, optionally reshaped by `mod` (e.g. a fade gradient). */
-  paint(ctx: Ctx, bb: BBox, hex: string, passes: Pass[], mod?: (l: Ctx) => void) {
-    const l = this.layer.x;
-    l.globalCompositeOperation = 'source-over';
-    l.clearRect(bb.x, bb.y, bb.w, bb.h);
-    l.fillStyle = hex;
-    l.fillRect(bb.x, bb.y, bb.w, bb.h);
-    this.clip(l, bb);
-    if (mod) {
-      mod(l);
-      l.globalCompositeOperation = 'source-over';
-    }
-    this.composite(ctx, bb, passes);
-  }
-
-  /** Arbitrary drawing (highlights, sparkles) clipped to the mask. */
-  paintCustom(ctx: Ctx, bb: BBox, draw: (l: Ctx) => void, passes: Pass[]) {
-    const l = this.layer.x;
-    l.globalCompositeOperation = 'source-over';
-    l.clearRect(bb.x, bb.y, bb.w, bb.h);
-    draw(l);
-    this.clip(l, bb);
-    this.composite(ctx, bb, passes);
-  }
-
-  /** Arbitrary drawing straight to the frame, no mask (soft radial gradients like blush). */
-  paintFree(ctx: Ctx, bb: BBox, draw: (l: Ctx) => void, passes: Pass[]) {
-    const l = this.layer.x;
-    l.globalCompositeOperation = 'source-over';
-    l.clearRect(bb.x, bb.y, bb.w, bb.h);
-    draw(l);
-    this.composite(ctx, bb, passes);
-  }
-
-  private clip(l: Ctx, bb: BBox) {
-    l.globalCompositeOperation = 'destination-in';
-    l.drawImage(this.mask.c, bb.x, bb.y, bb.w, bb.h, bb.x, bb.y, bb.w, bb.h);
-    l.globalCompositeOperation = 'source-over';
-  }
-
-  private composite(ctx: Ctx, bb: BBox, passes: Pass[]) {
-    ctx.save();
-    for (const p of passes) {
-      if (p.alpha <= 0) continue;
-      ctx.globalCompositeOperation = p.op;
-      ctx.globalAlpha = Math.min(1, p.alpha);
-      ctx.drawImage(this.layer.c, bb.x, bb.y, bb.w, bb.h, bb.x, bb.y, bb.w, bb.h);
-    }
-    ctx.restore();
+  /** Mask alpha (0..1) for a box, row-major. */
+  read(which: 0 | 1 | 2, bb: BBox): Float32Array {
+    const d = this.masks[which].x.getImageData(bb.x, bb.y, bb.w, bb.h).data;
+    const out = new Float32Array(bb.w * bb.h);
+    for (let i = 0; i < out.length; i++) out[i] = d[i * 4 + 3] / 255;
+    return out;
   }
 }

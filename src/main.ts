@@ -13,13 +13,14 @@ import {
   type Look,
 } from './catalog';
 import { FaceSmoother, toPoints, type FacePts } from './face';
-import { renderLook } from './makeup';
+import { renderLook, resetMakeup } from './makeup';
 import { createTracker, type Tracker } from './tracker';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const view = $<HTMLCanvasElement>('view');
-const ctx = view.getContext('2d', { alpha: false })!;
+// willReadFrequently: the makeup renderers edit pixels directly, so keep the frame CPU-readable
+const ctx = view.getContext('2d', { alpha: false, willReadFrequently: true })!;
 const video = $<HTMLVideoElement>('cam');
 const statusEl = $('status');
 const intro = $('intro');
@@ -306,6 +307,7 @@ async function startCamera(): Promise<string | null> {
   lastVideoTime = -1;
   livePts = null;
   smoother.reset();
+  resetMakeup();
   syncMode();
   return null;
 }
@@ -372,6 +374,7 @@ async function openPhoto(file: File) {
     const t = await trackerReady;
     if (!t) throw new Error('Face tracking is not available');
     const lm = await t.detectImage(canvas);
+    resetMakeup();
     photo = { canvas, pts: lm ? toPoints(lm, canvas.width, canvas.height) : null };
 
     stopStream();
@@ -447,6 +450,7 @@ function frame(now: number) {
       } else if (now - lastFaceAt > 250) {
         livePts = null;
         smoother.reset();
+        resetMakeup();
       }
     }
     drawMakeup(w, h, livePts, now);

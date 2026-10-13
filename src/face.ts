@@ -51,6 +51,9 @@ export type EyeIdx = typeof EYE_R;
 
 export const FACE_EDGE_R = 234;
 export const FACE_EDGE_L = 454;
+export const NOSE_BOTTOM = 2;
+export const CHIN = 152;
+export const GLABELLA = 168; // bare skin between the brows
 export const MOUTH_CORNERS = [MOUTH_CORNER_L, MOUTH_CORNER_R];
 
 const NEEDED = [
@@ -60,6 +63,9 @@ const NEEDED = [
     ...[EYE_R, EYE_L].flatMap((e) => [...e.upper, ...e.lower, ...e.browLower, ...e.browUpper, e.iris]),
     FACE_EDGE_R,
     FACE_EDGE_L,
+    NOSE_BOTTOM,
+    CHIN,
+    GLABELLA,
   ]),
 ];
 

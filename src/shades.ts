@@ -9,21 +9,13 @@ export type FinishId = 'matte' | 'satin' | 'gloss' | 'sheer';
 
 export interface Finish {
   label: string;
-  /** Strength of the hue/saturation ("color" blend) pass. */
-  tint: number;
-  /** Strength of the opaque pigment pass that covers the natural lip color. */
-  cover: number;
-  /** Strength of the multiply pass that deepens dark shades. */
-  depth: number;
-  /** Strength of the specular highlights. */
-  shine: number;
 }
 
 export const FINISHES: Record<FinishId, Finish> = {
-  matte: { label: 'Matte', tint: 0.9, cover: 0.34, depth: 0.26, shine: 0 },
-  satin: { label: 'Satin', tint: 0.9, cover: 0.26, depth: 0.18, shine: 0.3 },
-  gloss: { label: 'Gloss', tint: 0.85, cover: 0.18, depth: 0.1, shine: 0.8 },
-  sheer: { label: 'Sheer', tint: 0.65, cover: 0.06, depth: 0, shine: 0.3 },
+  matte: { label: 'Matte' },
+  satin: { label: 'Satin' },
+  gloss: { label: 'Gloss' },
+  sheer: { label: 'Sheer' },
 };
 
 export const FINISH_ORDER: FinishId[] = ['matte', 'satin', 'gloss', 'sheer'];
