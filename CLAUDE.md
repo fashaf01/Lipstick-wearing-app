@@ -1,33 +1,48 @@
-# Makeup Try-On
+# Try-On Clothes
 
-Web app (PWA, iOS-first) where people see makeup (lips, eyeshadow, liner, blush, brows) on their face live through the camera.
+Web app (PWA, iOS-first) where people see clothes on their body live through the camera. It replaced the earlier
+makeup try-on (still in git history at commit `eb790fd`).
 
 ## Decisions
 - Vanilla TypeScript + Vite, no UI framework. Mobile-first, installable on iPhone via Add to Home Screen.
-- Face tracking: `@mediapipe/tasks-vision` Face Landmarker, self-hosted in `public/mediapipe/`
-  (git-ignored; `npm install` runs `scripts/setup-assets.mjs` to fetch it). No runtime third-party requests.
-- Makeup is rendered **per pixel in linear light** (not flat colour/blend-mode overlays, which look like a filter).
-  Each product edits the frame pixels in place (`getImageData` -> modify -> `putImageData` on a small box), so the
-  canvas is created with `willReadFrequently: true`. Pigment takes its light/shade from the original pixel
-  luminance (`ratio = Y / yRef`), so lip lines, skin texture, lashes and hairs show through.
-- Renderers: `lips.ts` (edge = landmark contour refined by lip/skin chroma at the outer lip line only; gloss lit
-  from a height field of the lips), `eyes.ts` (eyeshadow in a per-eye lid coordinate frame, hard cut at the lash line,
-  skin/non-skin gate, shimmer glitter; liner), `cheeks.ts` (blush), `brows.ts` (hair-aware fill with streak noise).
-  `paint.ts` only builds small anti-aliased masks; `pixels.ts` has colour/noise/sampling helpers; `makeup.ts` layers
-  everything (blush, brows, eyeshadow, liner, lips). Reference colours (lip, skin) are measured live and smoothed.
-  Do not use `ctx.filter` (unsupported on Safari); mask edges use the offscreen `shadowBlur` trick.
-- Cost: a full look is about 7 ms/frame on a desktop CPU at 720p. Keep new per-pixel work inside small boxes.
-- All shades/finishes/looks are data in `src/catalog.ts` (lips come from `src/shades.ts`).
-- MediaPipe brow landmarks only bracket the upper half of a thick brow, so `brows.ts` searches further down.
-  Video chroma is half resolution, so chroma-based tests are blurred before use.
+- Body tracking: `@mediapipe/tasks-vision` Pose Landmarker (33 landmarks), self-hosted in `public/mediapipe/`
+  (git-ignored; `npm install` runs `scripts/setup-assets.mjs` to fetch the models). No runtime third-party requests.
+  `full` model by default, `?model=lite` for the small one.
+- Clothes are **2D skeletal mesh warps**, not 3D: each garment image gets a rig (shoulders, hips, sleeve / leg chains,
+  normalised to the image, see `RigDef` in `src/rig.ts`), a grid mesh and per-vertex bone weights. Every frame
+  `poseMesh` bends the mesh to the tracked joints (torso = bilinear quad; pelvis; limbs = chains that point where
+  the limb points but keep the garment's length, scaled by torso length so turning does not shrink sleeves).
+- Rendering is WebGL 2 (`src/gl.ts`): camera frame as a texture, garments drawn over it with premultiplied alpha.
+  The fragment shader multiplies by scene brightness and colour cast, borrows broad shading from the camera image
+  (mip level 4.5 relative to the torso mean), adds sensor grain, and masks an ellipse around the head. The canvas has
+  the video's pixel size and is shown with CSS `object-fit: cover` (mirrored with CSS for the front camera); capture
+  re-renders and copies in the same task, so no `preserveDrawingBuffer`.
+- Landmarks are paired by **picture side** (left of the image = `L`), not by MediaPipe's anatomical left/right, so mirrored
+  photos work. Garment rigs use the same convention (image-left first).
+- MediaPipe's hip landmarks sit lower than anatomical hip joints (shoulder to hip is ~0.6 m, not 0.52 m) and are the
+  noisiest, so hip spacing is pulled halfway towards `0.5 x shoulder width`. The built-in garments are drawn with
+  these proportions (see the header of `scripts/make-clothes.mjs`).
+- User garments: `src/cutout.ts` removes a plain background (flood fill from the border, sealed against outline gaps,
+  holes only if they match the background colour almost exactly), `src/autorig.ts` guesses the rig from the silhouette
+  with typical body proportions, `src/editor.ts` lets the user drag the points, `src/store.ts` keeps them in IndexedDB.
+- Built-in garments are generated: `node scripts/make-clothes.mjs` writes `public/clothes/*.svg`, `index.json` (for the
+  service worker) and `src/clothes.json` (catalogue + rigs). Edit the script, not the generated files.
+- **Never give a DOM element an id that is also a global MediaPipe's WASM uses** (`dbg` broke tracking: elements with ids
+  become `window` properties and shadow its emscripten globals).
 - Camera needs HTTPS (or localhost). `getUserMedia` must be started from a user gesture on iOS.
 - Native iOS app (App Store) is a possible later step via Capacitor; not built yet.
 
 ## Commands
 - `npm run dev` / `npm run build` (typechecks first) / `npm run preview`
+- `node scripts/make-clothes.mjs` regenerates the sample garments
 
 ## Testing notes
-- Verified with Playwright + Chromium using a fake camera (`--use-file-for-fake-video-capture`) and face photos
-  (a smiling/squinting face and a neutral face; check both when changing eye or brow geometry).
-- Not yet verified on a real iPhone/Safari (shadow-blur feathering, CPU canvas speed, GPU delegate, share sheet).
+- Verified with Playwright + Chromium (software WebGL): photo mode with `setInputFiles` on `#file`, camera mode with
+  `--use-fake-device-for-media-stream --use-file-for-fake-video-capture=clip.y4m`, the add-your-own flow with
+  `#file-garment`. The dev server exposes `window.__tryon` (also with `?debug=1`); `?debug=1` draws the joints.
+- Pose detection takes ~2 s per frame on the headless software CPU, so frame rate cannot be measured there.
+  Rendering is ~7 ms on software GL.
+- Test photos need one clearly visible person (the model picks one); crop group photos first.
+- Not yet verified on a real iPhone/Safari (WebGL 2 video textures, GPU delegate for pose, frame rate, IndexedDB blobs,
+  share sheet).
 - Production deploy: Vercel project `lipstick-tryon` (auto-deploys on push); public URL https://lipstick-tryon-kappa.vercel.app

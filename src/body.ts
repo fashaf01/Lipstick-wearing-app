@@ -110,12 +110,12 @@ export interface Head {
 }
 
 // Typical proportions, in units of shoulder-joint distance (used when a joint is out of frame or noisy)
-const TORSO = 1.4;
+const TORSO = 1.6;
 const HIP_RATIO = 0.5; // hip-joint distance / shoulder-joint distance
 const UPPER_ARM = 0.83;
 const FOREARM = 0.75;
-const THIGH_PER_TORSO = 0.83;
-const SHIN_PER_TORSO = 0.78;
+const THIGH_PER_TORSO = 0.72;
+const SHIN_PER_TORSO = 0.68;
 
 const VIS_SHOULDER = 0.4;
 const VIS_JOINT = 0.4;

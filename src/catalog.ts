@@ -25,6 +25,12 @@ export const KIND_LABEL: Record<Kind, string> = {
   dress: 'Dresses',
 };
 
+export const KIND_SINGULAR: Record<Kind, string> = {
+  top: 'Top',
+  bottom: 'Bottom',
+  dress: 'Dress',
+};
+
 export const KIND_ORDER: Kind[] = ['top', 'bottom', 'dress'];
 
 export interface Outfit {

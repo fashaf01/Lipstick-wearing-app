@@ -1,13 +1,13 @@
 {
-  "name": "Makeup Try-On",
-  "short_name": "Makeup Try-On",
-  "description": "Try on lipstick, eyeshadow, eyeliner, blush and brows live with your camera.",
+  "name": "Try-On Clothes",
+  "short_name": "Try-On",
+  "description": "Try on tops, bottoms and dresses live with your camera.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#14090f",
-  "theme_color": "#14090f",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

@@ -1,7 +1,7 @@
 // Offline cache: network-first for pages, cache-first for everything else
-// (hashed assets, the face model and the WASM runtime never change in place).
-const VERSION = 'v2';
-const CACHE = `makeup-tryon-${VERSION}`;
+// (hashed assets, the pose model and the WASM runtime never change in place).
+const VERSION = 'v1';
+const CACHE = `clothes-tryon-${VERSION}`;
 // Dev/preview servers send `Vary: Origin`, which would make pre-cached files miss for module scripts.
 const MATCH = { ignoreVary: true };
 
@@ -13,7 +13,7 @@ const STATIC = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
-  './mediapipe/face_landmarker.task',
+  './mediapipe/pose_landmarker_full.task',
   './mediapipe/wasm/vision_wasm_internal.js',
   './mediapipe/wasm/vision_wasm_internal.wasm',
 ];
@@ -27,6 +27,13 @@ self.addEventListener('install', (event) => {
       const bundles = [...html.matchAll(/(?:src|href)="(\.\/assets\/[^"]+)"/g)].map((m) => m[1]);
       await cache.put('./', page);
       await cache.addAll([...STATIC, ...bundles]);
+      // built-in garments (best effort: a missing list must not break the install)
+      try {
+        const list = await (await fetch('./clothes/index.json', { cache: 'reload' })).json();
+        await cache.addAll(list.map((src) => `./${src}`));
+      } catch {
+        /* garments are cached on first use instead */
+      }
       await self.skipWaiting();
     })(),
   );

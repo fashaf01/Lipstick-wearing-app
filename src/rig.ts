@@ -255,7 +255,7 @@ interface SegXf {
 }
 
 // Typical segment lengths per unit of torso length (shoulder joints -> hip joints)
-const NOMINAL = { upperArm: 0.58, forearm: 0.52, thigh: 0.83, shin: 0.78 };
+const NOMINAL = { upperArm: 0.5, forearm: 0.45, thigh: 0.72, shin: 0.68 };
 
 /**
  * Forward kinematics of the garment's own chain: every bone points the way the wearer's limb points,
@@ -295,7 +295,7 @@ export function poseMesh(m: Mesh, body: Body, out: Float32Array): void {
 
   // Scales. Length follows the torso (it does not change when you turn); width follows the shoulders
   // (sleeves) or hips (pelvis), which do shrink when you turn.
-  const Sl = isBottom ? (0.36 * body.torsoLen) / (m.restHipW || 1) : body.torsoLen / (m.restTorsoLen || 1);
+  const Sl = isBottom ? (0.31 * body.torsoLen) / (m.restHipW || 1) : body.torsoLen / (m.restTorsoLen || 1);
   const Sw = isBottom ? Sl : body.shoulderW / (m.restShoulderW || 1);
   const hipRatio = dist(body.hL, body.hR) / (m.restHipW || 1);
   const Sp = clamp(hipRatio, 0.7 * Sl, 1.35 * Sl);

@@ -140,14 +140,11 @@ export class Renderer {
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
+    // the camera image / photo lives on texture unit 1 (garments use unit 0); its filtering is set in drawSource
     this.srcTex = gl.createTexture()!;
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, this.srcTex);
     gl.activeTexture(gl.TEXTURE0);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     for (const name of ['uRes', 'uTex', 'uSrc', 'uTint', 'uShade', 'uShadeRef', 'uLight', 'uNoise', 'uSeed', 'uHeadOn', 'uHeadC', 'uHeadAxes', 'uHeadR']) {
       this.u[name] = gl.getUniformLocation(this.gp, name);

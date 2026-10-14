@@ -3,6 +3,7 @@ import {
   BUILT_IN,
   KIND_LABEL,
   KIND_ORDER,
+  KIND_SINGULAR,
   defaultFit,
   emptyOutfit,
   wear,
@@ -11,10 +12,13 @@ import {
   type Outfit,
 } from './catalog';
 import { buildBody, fitBody, PoseSmoother, type Body, type Pt33 } from './body';
-import { loadGarment, type LoadedGarment } from './garments';
+import { cutout } from './cutout';
+import { openEditor } from './editor';
+import { loadGarment, loadImage, type LoadedGarment } from './garments';
 import { Renderer } from './gl';
 import { createPoseTracker, type Landmark, type PoseTracker } from './pose';
 import { poseMesh, type Kind } from './rig';
+import { deleteStored, listStored, saveStored, type StoredGarment } from './store';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -43,25 +47,40 @@ const STORE_KEY = 'clothes-tryon:v1';
 let outfit: Outfit = emptyOutfit();
 let fit: Record<Kind, Fit> = defaultFit();
 let tab: Tab = 'top';
+let collapsed = false;
+let savedOutfit: Partial<Outfit> = {};
 try {
-  const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as { outfit?: Outfit; fit?: Record<Kind, Fit>; tab?: string } | null;
+  const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as {
+    outfit?: Outfit;
+    fit?: Record<Kind, Fit>;
+    tab?: string;
+    collapsed?: boolean;
+  } | null;
   if (saved) {
+    savedOutfit = saved.outfit ?? {};
     for (const k of KIND_ORDER) {
-      const id = saved.outfit?.[k];
-      if (typeof id === 'string' && byId(id)?.kind === k) outfit[k] = id;
       const f = saved.fit?.[k];
       if (f && Number.isFinite(f.size) && Number.isFinite(f.dy)) fit[k] = { size: Math.min(1.3, Math.max(0.8, f.size)), dy: Math.min(0.3, Math.max(-0.3, f.dy)) };
     }
     if (KIND_ORDER.includes(saved.tab as Kind)) tab = saved.tab as Kind;
+    collapsed = !!saved.collapsed;
   } else {
     outfit = wear(wear(outfit, 'top', 'tee-red'), 'bottom', 'jeans-blue');
   }
 } catch {
   /* storage unavailable (private mode) – defaults are fine */
 }
+/** Re-applies the remembered outfit for garments that exist now (user garments load a moment later). */
+function restoreOutfit() {
+  for (const k of KIND_ORDER) {
+    const id = savedOutfit[k];
+    if (!outfit[k] && typeof id === 'string' && byId(id)?.kind === k) outfit[k] = id;
+  }
+}
+restoreOutfit();
 function persist() {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify({ outfit, fit, tab }));
+    localStorage.setItem(STORE_KEY, JSON.stringify({ outfit, fit, tab, collapsed }));
   } catch {
     /* ignore */
   }
@@ -131,6 +150,8 @@ const controlsEl = $('controls');
 const sizeEl = $<HTMLInputElement>('fit-size');
 const dyEl = $<HTMLInputElement>('fit-dy');
 const NONE = '__none';
+const ADD = '__add';
+const garmentInput = $<HTMLInputElement>('file-garment');
 
 const noneSvg =
   '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg>';
@@ -154,6 +175,9 @@ function buildTabs() {
   }
 }
 
+const plusSvg =
+  '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+
 function renderCards() {
   cardsEl.textContent = '';
   const none = document.createElement('button');
@@ -165,6 +189,15 @@ function renderCards() {
   none.innerHTML = `${noneSvg}<span>None</span>`;
   none.addEventListener('click', () => choose(null));
   cardsEl.appendChild(none);
+
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'card add';
+  add.dataset.id = ADD;
+  add.setAttribute('aria-label', 'Add your own clothes from a photo');
+  add.innerHTML = `${plusSvg}<span>Add yours</span>`;
+  add.addEventListener('click', () => garmentInput.click());
+  cardsEl.appendChild(add);
 
   for (const def of garments.filter((g) => g.kind === tab)) {
     const b = document.createElement('button');
@@ -179,6 +212,18 @@ function renderCards() {
     img.loading = 'lazy';
     b.appendChild(img);
     if (loading.has(def.id)) b.insertAdjacentHTML('beforeend', '<span class="busy">…</span>');
+    if (def.custom) {
+      const edit = document.createElement('span');
+      edit.className = 'edit';
+      edit.setAttribute('role', 'button');
+      edit.setAttribute('aria-label', `Edit ${def.name}`);
+      edit.textContent = '✎';
+      edit.addEventListener('click', (e) => {
+        e.stopPropagation();
+        void editGarment(def.id);
+      });
+      b.appendChild(edit);
+    }
     b.addEventListener('click', () => choose(def.id));
     cardsEl.appendChild(b);
   }
@@ -200,7 +245,7 @@ function syncUI(scroll: boolean) {
     (el.querySelector('.dot') as HTMLElement).style.background = outfit[k] ? (byId(outfit[k])?.color ?? '#fff') : '';
   }
   const def = byId(outfit[tab]);
-  $('item-name').textContent = def ? def.name : `No ${KIND_LABEL[tab].toLowerCase().replace(/s$/, '')}`;
+  $('item-name').textContent = def ? def.name : `No ${KIND_SINGULAR[tab].toLowerCase()}`;
   $('item-sub').textContent = def ? (def.custom ? 'Yours' : '') : 'Tap one to try it on';
   for (const el of cardsEl.children as Iterable<HTMLElement>) {
     const on = el.dataset.id === (def ? def.id : NONE);
@@ -288,6 +333,8 @@ async function startCamera(): Promise<string | null> {
 
 function syncMode() {
   view.classList.toggle('mirror', mode === 'camera' && mirrored);
+  view.classList.toggle('photo', mode === 'photo');
+  overlay.classList.toggle('photo', mode === 'photo');
   $('mode-label').textContent = mode === 'photo' ? 'Camera' : 'Photo';
   $('btn-flip').hidden = mode === 'photo';
   dirty = true;
@@ -380,6 +427,154 @@ $('btn-mode').addEventListener('click', () => {
   if (mode === 'photo') void enterCamera(false);
   else fileInput.click();
 });
+
+// ---------- your own garments ----------
+const prettyName = (file: string) => {
+  const base = file.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
+  return (base ? base[0].toUpperCase() + base.slice(1) : 'My garment').slice(0, 28);
+};
+
+function averageColour(canvas: HTMLCanvasElement): string {
+  const c = document.createElement('canvas');
+  c.width = c.height = 8;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(canvas, 0, 0, 8, 8);
+  const d = g.getImageData(0, 0, 8, 8).data;
+  let r = 0;
+  let gg = 0;
+  let b = 0;
+  let n = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 128) continue;
+    r += d[i];
+    gg += d[i + 1];
+    b += d[i + 2];
+    n++;
+  }
+  if (!n) return '#ffffff';
+  return `rgb(${Math.round(r / n)}, ${Math.round(gg / n)}, ${Math.round(b / n)})`;
+}
+
+const toPng = (canvas: HTMLCanvasElement) =>
+  new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not save the image'))), 'image/png'));
+
+function addCustomDef(s: StoredGarment) {
+  garments.push({ id: s.id, name: s.name, kind: s.kind, color: s.color, src: URL.createObjectURL(s.blob), rig: s.rig, custom: true });
+}
+
+function unload(id: string) {
+  const g = loaded.get(id);
+  if (g && renderer) renderer.release(g.gpu);
+  loaded.delete(id);
+}
+
+function toast(text: string, ms = 5000) {
+  setStatus(text);
+  setTimeout(() => {
+    if (statusText === text) setStatus('');
+  }, ms);
+}
+
+void listStored().then((all) => {
+  for (const s of all) addCustomDef(s);
+  if (!all.length) return;
+  restoreOutfit();
+  for (const k of KIND_ORDER) if (outfit[k]) garmentFor(outfit[k]!);
+  renderCards();
+});
+
+async function addGarmentFromFile(file: File) {
+  setStatus('Preparing your garment…');
+  try {
+    const img = await loadFile(file);
+    const cut = cutout(img);
+    setStatus('');
+    const res = await openEditor({ canvas: cut.canvas, alpha: cut.alpha, kind: tab, name: prettyName(file.name), warning: cut.warning });
+    if (res.action !== 'save') return;
+    const stored: StoredGarment = {
+      id: `my-${Date.now().toString(36)}`,
+      name: res.name,
+      kind: res.kind,
+      blob: await toPng(cut.canvas),
+      rig: res.rig,
+      color: averageColour(cut.canvas),
+      created: Date.now(),
+    };
+    const saved = await saveStored(stored);
+    addCustomDef(stored);
+    tab = res.kind;
+    outfit = wear(outfit, res.kind, stored.id);
+    garmentFor(stored.id);
+    persist();
+    renderCards();
+    syncUI(true);
+    if (!saved) toast("Couldn't save it on this device (private browsing?). It will be here until you close the app.");
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Could not read that image');
+  }
+}
+
+async function editGarment(id: string) {
+  const def = byId(id);
+  if (!def?.custom) return;
+  try {
+    const img = await loadImage(def.src);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const g = canvas.getContext('2d', { willReadFrequently: true })!;
+    g.drawImage(img, 0, 0);
+    const data = g.getImageData(0, 0, canvas.width, canvas.height).data;
+    const alpha = new Uint8ClampedArray(canvas.width * canvas.height);
+    for (let i = 0; i < alpha.length; i++) alpha[i] = data[i * 4 + 3];
+
+    const res = await openEditor({ canvas, alpha, kind: def.kind, name: def.name, rig: def.rig, canDelete: true });
+    if (res.action === 'cancel') return;
+
+    for (const k of KIND_ORDER) if (outfit[k] === id) outfit[k] = null;
+    unload(id);
+    if (res.action === 'delete') {
+      await deleteStored(id);
+      URL.revokeObjectURL(def.src);
+      garments.splice(garments.indexOf(def), 1);
+    } else {
+      def.name = res.name;
+      def.kind = res.kind;
+      def.rig = res.rig;
+      const blob = await (await fetch(def.src)).blob();
+      await saveStored({ id, name: def.name, kind: def.kind, blob, rig: def.rig, color: def.color, created: Date.now() });
+      tab = def.kind;
+      outfit = wear(outfit, def.kind, id);
+      garmentFor(id);
+    }
+    persist();
+    renderCards();
+    syncUI(true);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Could not open that garment');
+  }
+}
+
+garmentInput.addEventListener('change', () => {
+  const f = garmentInput.files?.[0];
+  garmentInput.value = '';
+  if (f) void addGarmentFromFile(f);
+});
+
+// ---------- collapsible controls ----------
+const sheet = $('sheet');
+const sheetToggle = $('sheet-toggle');
+function applyCollapsed() {
+  sheet.classList.toggle('collapsed', collapsed);
+  sheetToggle.setAttribute('aria-expanded', String(!collapsed));
+  sheetToggle.setAttribute('aria-label', collapsed ? 'Show controls' : 'Hide controls');
+}
+sheetToggle.addEventListener('click', () => {
+  collapsed = !collapsed;
+  applyCollapsed();
+  persist();
+});
+applyCollapsed();
 
 // ---------- compare (hold to see yourself without the clothes) ----------
 const compareBtn = $('btn-compare');
@@ -679,21 +874,24 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
 }
 
 // Test hook for the browser-based checks (Playwright): lets a script pick garments and read state.
-(window as unknown as { __tryon: unknown }).__tryon = {
-  wear: (kind: Kind, id: string | null) => {
-    outfit = wear(outfit, kind, id);
-    if (id) garmentFor(id);
-    syncUI(false);
-  },
-  setFit: (kind: Kind, size: number, dy: number) => {
-    fit[kind] = { size, dy };
-    dirty = true;
-  },
-  get body() {
-    return mode === 'photo' ? photo?.body : liveBody;
-  },
-  get ready() {
-    return !!tracker;
-  },
-  stats,
-};
+// Only in dev builds or with ?debug=1.
+if (import.meta.env.DEV || debug) {
+  (window as unknown as { __tryon: unknown }).__tryon = {
+    wear: (kind: Kind, id: string | null) => {
+      outfit = wear(outfit, kind, id);
+      if (id) garmentFor(id);
+      syncUI(false);
+    },
+    setFit: (kind: Kind, size: number, dy: number) => {
+      fit[kind] = { size, dy };
+      dirty = true;
+    },
+    get body() {
+      return mode === 'photo' ? photo?.body : liveBody;
+    },
+    get ready() {
+      return !!tracker;
+    },
+    stats,
+  };
+}

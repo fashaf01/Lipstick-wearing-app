@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Try-On Clothes</title>
     <meta name="description" content="Try on tops, bottoms and dresses live with your camera." />
-    <meta name="theme-color" content="#0c1015" />
+    <meta name="theme-color" content="#0b0f14" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -31,6 +31,7 @@
       </header>
 
       <section class="sheet" id="sheet" aria-label="Clothes">
+        <button id="sheet-toggle" class="sheet-handle" type="button" aria-label="Hide controls" aria-expanded="true"></button>
         <div class="tabs" id="tabs" role="tablist" aria-label="Type of clothing"></div>
         <div class="item-title"><span id="item-name"></span><small id="item-sub"></small></div>
         <div class="cards" id="cards" role="radiogroup" aria-label="Garment"></div>
@@ -60,10 +61,13 @@
       <div id="intro" class="intro">
         <div class="intro-card">
           <svg class="intro-logo" viewBox="0 0 512 512" aria-hidden="true">
-            <path d="M256 120c-18 0-30 10-30 24 0 10 6 16 16 22 8 5 14 10 14 18v10L96 330c-14 9-8 30 8 30h304c16 0 22-21 8-30L256 194" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M168 150 L214 132 C226 164 286 164 298 132 L344 150 L420 214 L376 270 L342 246 L342 406 L170 406 L170 246 L136 270 L92 214 Z" fill="#fff"/>
+            <circle cx="256" cy="92" r="11" fill="#5eead4"/>
+            <path d="M256 103 L256 118 M256 118 C238 118 206 134 190 146 M256 118 C274 118 306 134 322 146" fill="none" stroke="#5eead4" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <h1>Try clothes on live</h1>
-          <p>Open your camera and see tops, jeans, skirts and dresses on your body in real time. Step back so your whole body is in view, then pick something to wear.</p>
+          <p>Open your camera and see tops, jeans, skirts and dresses on your body in real time. Step back so your whole body is in view, then pick something to wear. You can add your own clothes from a photo.</p>
+          <p class="tip">Tip: wear something plain and close-fitting for the most realistic result.</p>
           <button id="btn-start" class="primary" type="button">Start camera</button>
           <button id="btn-intro-photo" class="link" type="button">or try on a photo of you</button>
           <p id="intro-error" class="error" role="alert" hidden></p>
@@ -79,7 +83,30 @@
         </div>
       </div>
 
+      <div id="editor" class="editor" hidden>
+        <header class="editor-bar">
+          <button id="ed-cancel" class="ghost small" type="button">Cancel</button>
+          <input id="ed-name" type="text" maxlength="28" placeholder="Name" aria-label="Garment name" />
+          <button id="ed-save" class="primary small" type="button">Save</button>
+        </header>
+        <div class="editor-opts">
+          <div class="segmented" id="ed-kind" role="radiogroup" aria-label="Type of clothing"></div>
+          <div class="segmented" id="ed-len" role="radiogroup" aria-label="Shape"></div>
+          <label class="check"><input type="checkbox" id="ed-sym" checked /><span>Keep both sides matching</span></label>
+        </div>
+        <p id="ed-warn" class="warn" role="status" hidden></p>
+        <div class="editor-stage-wrap">
+          <div class="editor-stage" id="ed-stage">
+            <canvas id="ed-canvas"></canvas>
+            <svg id="ed-lines" aria-hidden="true"></svg>
+          </div>
+        </div>
+        <p id="ed-hint" class="hint"></p>
+        <button id="ed-delete" class="link" type="button" hidden>Delete this garment</button>
+      </div>
+
       <input id="file" type="file" accept="image/*" hidden />
+      <input id="file-garment" type="file" accept="image/*" hidden />
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

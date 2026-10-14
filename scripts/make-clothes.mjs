@@ -96,9 +96,10 @@ function wrap({ id, W, H, cx, d, base, body, over = '', extraDefs = '', hole = '
 </svg>`;
 }
 
-// Real proportions (175 cm adult, 1 m = 700 px): shoulder joint -> hip joint 52 cm, a normal tee hem sits
-// ~12 cm below the hip joint, the waistband of jeans ~17 cm above it.
-const HEM_BELOW_HIP = 84;
+// Proportions (175 cm adult, 1 m = 700 px) measured against MediaPipe's own landmarks, which sit lower than
+// the anatomical joints: shoulder -> hip landmark is ~60 cm, a normal tee hem ends ~3 cm below the hip
+// landmark, the waistband of jeans ~20 cm above it.
+const HEM_BELOW_HIP = 24;
 const items = [];
 const norm = (W, H, p) => [+(p[0] / W).toFixed(4), +(p[1] / H).toFixed(4)];
 
@@ -357,7 +358,7 @@ function dress({ id, name, color, flare = 1 }) {
   const svg = wrap({ id, W, H, cx, d, base, body });
   const sh = [cx - 116, 36];
   const shR = [cx + 116, 36];
-  const hipY = 410; // natural waist seam is ~16 cm above the hip joint
+  const hipY = 440; // natural waist seam is ~20 cm above the hip landmark
   items.push({
     id,
     name,
@@ -427,7 +428,7 @@ function pants({ id, name, color, short = false, denim = true, wide = false }) {
   body += `<ellipse cx="${cx}" cy="212" rx="34" ry="30" fill="url(#${id}-pit)"/>`;
   const svg = wrap({ id, W, H, cx, d, base, body, extraDefs });
 
-  const hipY = 116; // waistband top is ~17 cm above the hip joint
+  const hipY = 140; // waistband top is ~20 cm above the hip landmark
   const hipX = 66;
   const ankleY = short ? 0 : hem - 25;
   const legX = (y) => 70 + ((y - hipY) / (hem - hipY)) * 18;
@@ -467,7 +468,7 @@ function skirt({ id, name, color, long = false }) {
   }
   body += `<path d="M${cx - hemHalf + 14} ${hem - 24}L${cx + hemHalf - 14} ${hem - 24}" stroke="#000" stroke-opacity=".2" stroke-width="2" stroke-dasharray="6 4"/>`;
   const svg = wrap({ id, W, H, cx, d, base, body });
-  const hipY = 108;
+  const hipY = 140;
   items.push({
     id,
     name,
@@ -506,4 +507,6 @@ dress({ id: 'dress-blush', name: 'Blush dress', color: '#e5aeb2', flare: 1.3 });
 dress({ id: 'dress-black', name: 'Little black dress', color: '#202126', flare: 0.55 });
 
 writeFileSync(join(root, 'src', 'clothes.json'), JSON.stringify(items, null, 1) + '\n');
+// the service worker pre-caches these so the built-in garments work offline
+writeFileSync(join(outDir, 'index.json'), JSON.stringify(items.map((i) => i.src)) + '\n');
 console.log(`Wrote ${items.length} garments`);
