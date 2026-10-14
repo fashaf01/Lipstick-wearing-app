@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="350" viewBox="0 0 560 350">
+<defs>
+  <linearGradient id="shorts-denim-v" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".16"/>
+    <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".16"/>
+  </linearGradient>
+  <linearGradient id="shorts-denim-h" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#000" stop-opacity=".30"/>
+    <stop offset=".16" stop-color="#000" stop-opacity=".04"/>
+    <stop offset=".42" stop-color="#fff" stop-opacity=".09"/>
+    <stop offset=".58" stop-color="#fff" stop-opacity=".05"/>
+    <stop offset=".84" stop-color="#000" stop-opacity=".05"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".30"/>
+  </linearGradient>
+  <radialGradient id="shorts-denim-pit" cx=".5" cy=".5" r=".5">
+    <stop offset="0" stop-color="#000" stop-opacity=".34"/>
+    <stop offset="1" stop-color="#000" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="shorts-denim-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.2"/></filter>
+  <filter id="shorts-denim-grain" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 -.18"/>
+  </filter>
+  <clipPath id="shorts-denim-clip"><path d="M150 0Q132 40 126 110Q128 220 130 250L138 340L242 340Q262 290 275 196L285 196Q298 290 318 340L422 340L430 250Q432 220 434 110Q428 40 410 0Z"/></clipPath>
+  
+  <pattern id="shorts-denim-twill" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(52)"><rect width="6" height="6" fill="none"/><rect width="2" height="6" fill="#fff" fill-opacity=".07"/></pattern>
+</defs>
+<g >
+  <path d="M150 0Q132 40 126 110Q128 220 130 250L138 340L242 340Q262 290 275 196L285 196Q298 290 318 340L422 340L430 250Q432 220 434 110Q428 40 410 0Z" fill="#6b90bf"/>
+  <g clip-path="url(#shorts-denim-clip)">
+    <rect width="560" height="350" fill="url(#shorts-denim-twill)"/>
+    <rect x="130" y="0" width="300" height="44" fill="#6082ac"/>
+    <path d="M130 44L430 44" stroke="#e0a44a" stroke-opacity="0.8" stroke-width="2.2" stroke-dasharray="7 4"/>
+    <path d="M130 5L430 5" stroke="#e0a44a" stroke-opacity="0.8" stroke-width="2.2" stroke-dasharray="7 4"/>
+    <circle cx="280" cy="26" r="9" fill="#b5c8df" stroke="#000" stroke-opacity=".3"/>
+    <path d="M280 44L280 186C282 194 286 200 296 202" stroke="#e0a44a" stroke-opacity="0.8" stroke-width="2.4" stroke-dasharray="7 4" fill="none"/>
+    <path d="M168 46C160 90 180 150 224 168" stroke="#e0a44a" stroke-opacity="0.8" stroke-width="2.4" fill="none" stroke-dasharray="7 4"/>
+    <path d="M392 46C400 90 380 150 336 168" stroke="#e0a44a" stroke-opacity="0.8" stroke-width="2.4" fill="none" stroke-dasharray="7 4"/>
+    <path d="M168 46C162 80 176 132 210 156" stroke="#000" stroke-opacity=".22" stroke-width="2" fill="none"/>
+    <path d="M392 46C398 80 384 132 350 156" stroke="#000" stroke-opacity=".22" stroke-width="2" fill="none"/><rect x="164" y="-2" width="12" height="52" rx="3" fill="#5e7fa8" stroke="#000" stroke-opacity=".2"/><rect x="204" y="-2" width="12" height="52" rx="3" fill="#5e7fa8" stroke="#000" stroke-opacity=".2"/><rect x="252" y="-2" width="12" height="52" rx="3" fill="#5e7fa8" stroke="#000" stroke-opacity=".2"/><rect x="296" y="-2" width="12" height="52" rx="3" fill="#5e7fa8" stroke="#000" stroke-opacity=".2"/><rect x="344" y="-2" width="12" height="52" rx="3" fill="#5e7fa8" stroke="#000" stroke-opacity=".2"/><rect x="384" y="-2" width="12" height="52" rx="3" fill="#5e7fa8" stroke="#000" stroke-opacity=".2"/><path d="M184 200C180 330 184 480 190 310" stroke="#fff" stroke-opacity=".10" stroke-width="22" fill="none" filter="url(#shorts-denim-soft)"/><path d="M240 230C236 330 232 480 230 310" stroke="#000" stroke-opacity=".14" stroke-width="14" fill="none" filter="url(#shorts-denim-soft)"/><path d="M144 318L236 318" stroke="#e0a44a" stroke-opacity="0.8" stroke-width="2.2" stroke-dasharray="6 4"/><path d="M376 200C380 330 376 480 370 310" stroke="#fff" stroke-opacity=".10" stroke-width="22" fill="none" filter="url(#shorts-denim-soft)"/><path d="M320 230C324 330 328 480 330 310" stroke="#000" stroke-opacity=".14" stroke-width="14" fill="none" filter="url(#shorts-denim-soft)"/><path d="M416 318L324 318" stroke="#e0a44a" stroke-opacity="0.8" stroke-width="2.2" stroke-dasharray="6 4"/><ellipse cx="280" cy="212" rx="34" ry="30" fill="url(#shorts-denim-pit)"/>
+    <rect width="560" height="350" fill="url(#shorts-denim-h)"/>
+    <rect width="560" height="350" fill="url(#shorts-denim-v)"/>
+    <rect width="560" height="350" filter="url(#shorts-denim-grain)" opacity=".5"/>
+    
+  </g>
+  <path d="M150 0Q132 40 126 110Q128 220 130 250L138 340L242 340Q262 290 275 196L285 196Q298 290 318 340L422 340L430 250Q432 220 434 110Q428 40 410 0Z" fill="none" stroke="#3b4f69" stroke-opacity=".55" stroke-width="2.2" stroke-linejoin="round"/>
+</g>
+</svg>

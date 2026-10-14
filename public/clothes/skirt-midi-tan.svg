@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="584" viewBox="0 0 600 584">
+<defs>
+  <linearGradient id="skirt-midi-tan-v" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".16"/>
+    <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".16"/>
+  </linearGradient>
+  <linearGradient id="skirt-midi-tan-h" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#000" stop-opacity=".30"/>
+    <stop offset=".16" stop-color="#000" stop-opacity=".04"/>
+    <stop offset=".42" stop-color="#fff" stop-opacity=".09"/>
+    <stop offset=".58" stop-color="#fff" stop-opacity=".05"/>
+    <stop offset=".84" stop-color="#000" stop-opacity=".05"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".30"/>
+  </linearGradient>
+  <radialGradient id="skirt-midi-tan-pit" cx=".5" cy=".5" r=".5">
+    <stop offset="0" stop-color="#000" stop-opacity=".34"/>
+    <stop offset="1" stop-color="#000" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="skirt-midi-tan-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.2"/></filter>
+  <filter id="skirt-midi-tan-grain" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 -.18"/>
+  </filter>
+  <clipPath id="skirt-midi-tan-clip"><path d="M170 0Q160 40 152 100Q130 260 85 548Q200 578 300 572L300 572Q400 578 515 548Q470 260 448 100Q440 40 430 0Z"/></clipPath>
+  
+  
+</defs>
+<g >
+  <path d="M170 0Q160 40 152 100Q130 260 85 548Q200 578 300 572L300 572Q400 578 515 548Q470 260 448 100Q440 40 430 0Z" fill="#c2a27a"/>
+  <g clip-path="url(#skirt-midi-tan-clip)">
+    <rect x="150" y="0" width="300" height="40" fill="#977e5f"/>
+    <path d="M150 40L450 40" stroke="#000" stroke-opacity=".25" stroke-width="2"/>
+    <circle cx="300" cy="20" r="8" fill="#dac7af"/><path d="M168 50C136.27272727272725 280 104.54545454545453 448 104.54545454545453 560" stroke="#fff" stroke-opacity="0.1" stroke-width="13" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M190 50C163.56060606060606 280 137.12121212121212 448 137.12121212121212 560" stroke="#000" stroke-opacity="0.11" stroke-width="16" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M212 50C190.84848484848484 280 169.6969696969697 448 169.6969696969697 560" stroke="#fff" stroke-opacity="0.1" stroke-width="13" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M234 50C218.13636363636363 280 202.27272727272725 448 202.27272727272725 560" stroke="#000" stroke-opacity="0.11" stroke-width="16" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M256 50C245.42424242424244 280 234.84848484848484 448 234.84848484848484 560" stroke="#fff" stroke-opacity="0.1" stroke-width="13" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M278 50C272.71212121212125 280 267.42424242424244 448 267.42424242424244 560" stroke="#000" stroke-opacity="0.11" stroke-width="16" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M300 50C300 280 300 448 300 560" stroke="#fff" stroke-opacity="0.1" stroke-width="13" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M322 50C327.28787878787875 280 332.57575757575756 448 332.57575757575756 560" stroke="#000" stroke-opacity="0.11" stroke-width="16" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M344 50C354.57575757575756 280 365.1515151515151 448 365.1515151515151 560" stroke="#fff" stroke-opacity="0.1" stroke-width="13" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M366 50C381.8636363636364 280 397.72727272727275 448 397.72727272727275 560" stroke="#000" stroke-opacity="0.11" stroke-width="16" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M388 50C409.1515151515151 280 430.3030303030303 448 430.3030303030303 560" stroke="#fff" stroke-opacity="0.1" stroke-width="13" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M410 50C436.43939393939394 280 462.8787878787879 448 462.8787878787879 560" stroke="#000" stroke-opacity="0.11" stroke-width="16" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M432 50C463.72727272727275 280 495.4545454545455 448 495.4545454545455 560" stroke="#fff" stroke-opacity="0.1" stroke-width="13" fill="none" filter="url(#skirt-midi-tan-soft)"/><path d="M99 536L501 536" stroke="#000" stroke-opacity=".2" stroke-width="2" stroke-dasharray="6 4"/>
+    <rect width="600" height="584" fill="url(#skirt-midi-tan-h)"/>
+    <rect width="600" height="584" fill="url(#skirt-midi-tan-v)"/>
+    <rect width="600" height="584" filter="url(#skirt-midi-tan-grain)" opacity=".5"/>
+    
+  </g>
+  <path d="M170 0Q160 40 152 100Q130 260 85 548Q200 578 300 572L300 572Q400 578 515 548Q470 260 448 100Q440 40 430 0Z" fill="none" stroke="#6b5943" stroke-opacity=".55" stroke-width="2.2" stroke-linejoin="round"/>
+</g>
+</svg>

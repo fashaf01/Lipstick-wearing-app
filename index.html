@@ -3,13 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Makeup Try-On</title>
-    <meta name="description" content="Try on lipstick, eyeshadow, eyeliner, blush and brows live with your camera." />
-    <meta name="theme-color" content="#14090f" />
+    <title>Try-On Clothes</title>
+    <meta name="description" content="Try on tops, bottoms and dresses live with your camera." />
+    <meta name="theme-color" content="#0c1015" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Makeup Try-On" />
+    <meta name="apple-mobile-web-app-title" content="Try-On Clothes" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
@@ -17,27 +17,31 @@
   <body>
     <div id="app">
       <div class="stage">
-        <canvas id="view" aria-label="Live makeup try-on preview"></canvas>
+        <canvas id="view" aria-label="Live clothes try-on preview"></canvas>
+        <canvas id="joints-overlay" hidden></canvas>
         <video id="cam" playsinline muted autoplay></video>
         <div id="status" class="pill" role="status" hidden></div>
       </div>
 
       <header class="topbar">
-        <div class="brand">Makeup <span>Try-On</span></div>
+        <div class="brand">Try-On <span>Clothes</span></div>
         <button id="btn-flip" class="icon-btn" aria-label="Switch camera">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h3l1.5-2h9L18 7h3v12H3z"/><path d="M9 13a3 3 0 0 1 5.2-2M15 13a3 3 0 0 1-5.2 2"/><path d="M14.5 9.5v1.8h-1.8M9.5 16.5v-1.8h1.8" /></svg>
         </button>
       </header>
 
-      <section class="sheet" id="sheet" aria-label="Makeup controls">
-        <div class="tabs" id="tabs" role="tablist" aria-label="Makeup type"></div>
-        <div class="shade-title"><span id="shade-name"></span><small id="shade-family"></small></div>
-        <div class="swatches" id="swatches" role="radiogroup" aria-label="Shade"></div>
+      <section class="sheet" id="sheet" aria-label="Clothes">
+        <div class="tabs" id="tabs" role="tablist" aria-label="Type of clothing"></div>
+        <div class="item-title"><span id="item-name"></span><small id="item-sub"></small></div>
+        <div class="cards" id="cards" role="radiogroup" aria-label="Garment"></div>
         <div class="controls" id="controls">
-          <div class="segmented" id="finishes" role="radiogroup" aria-label="Finish"></div>
-          <label class="intensity">
-            <span>Intensity</span>
-            <input id="intensity" type="range" min="0" max="100" step="1" />
+          <label class="slider">
+            <span>Size</span>
+            <input id="fit-size" type="range" min="80" max="130" step="1" />
+          </label>
+          <label class="slider">
+            <span>Height</span>
+            <input id="fit-dy" type="range" min="-30" max="30" step="1" />
           </label>
         </div>
         <div class="actions">
@@ -56,21 +60,19 @@
       <div id="intro" class="intro">
         <div class="intro-card">
           <svg class="intro-logo" viewBox="0 0 512 512" aria-hidden="true">
-            <path d="M96 276C150 226 210 220 256 252C302 220 362 226 416 276C360 292 300 300 256 300C212 300 152 292 96 276Z" fill="#e0334f"/>
-            <path d="M96 276C160 300 210 304 256 304C302 304 352 300 416 276C390 360 330 410 256 410C182 410 122 360 96 276Z" fill="#c8102e"/>
-            <path d="M190 350C220 366 292 366 322 350" stroke="#fff" stroke-opacity=".55" stroke-width="12" stroke-linecap="round" fill="none"/>
+            <path d="M256 120c-18 0-30 10-30 24 0 10 6 16 16 22 8 5 14 10 14 18v10L96 330c-14 9-8 30 8 30h304c16 0 22-21 8-30L256 194" fill="none" stroke="#fff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <h1>Try makeup live</h1>
-          <p>Open your camera and try lipstick, eyeshadow, eyeliner, blush and brows in real time. Pick a ready-made look or build your own, then take a photo and share it.</p>
+          <h1>Try clothes on live</h1>
+          <p>Open your camera and see tops, jeans, skirts and dresses on your body in real time. Step back so your whole body is in view, then pick something to wear.</p>
           <button id="btn-start" class="primary" type="button">Start camera</button>
-          <button id="btn-intro-photo" class="link" type="button">or try on a photo</button>
+          <button id="btn-intro-photo" class="link" type="button">or try on a photo of you</button>
           <p id="intro-error" class="error" role="alert" hidden></p>
           <p class="privacy">Everything runs on your device. Your video is never uploaded.</p>
         </div>
       </div>
 
       <div id="result" class="result" hidden>
-        <img id="result-img" alt="Your makeup look" />
+        <img id="result-img" alt="Your outfit" />
         <div class="result-actions">
           <button id="btn-share" class="primary" type="button">Share / Save</button>
           <button id="btn-close" class="ghost" type="button">Close</button>

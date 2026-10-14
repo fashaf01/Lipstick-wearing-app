@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="860" viewBox="0 0 640 860">
+<defs>
+  <linearGradient id="dress-blush-v" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".16"/>
+    <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".16"/>
+  </linearGradient>
+  <linearGradient id="dress-blush-h" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#000" stop-opacity=".30"/>
+    <stop offset=".16" stop-color="#000" stop-opacity=".04"/>
+    <stop offset=".42" stop-color="#fff" stop-opacity=".09"/>
+    <stop offset=".58" stop-color="#fff" stop-opacity=".05"/>
+    <stop offset=".84" stop-color="#000" stop-opacity=".05"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".30"/>
+  </linearGradient>
+  <radialGradient id="dress-blush-pit" cx=".5" cy=".5" r=".5">
+    <stop offset="0" stop-color="#000" stop-opacity=".34"/>
+    <stop offset="1" stop-color="#000" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="dress-blush-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.2"/></filter>
+  <filter id="dress-blush-grain" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 -.18"/>
+  </filter>
+  <clipPath id="dress-blush-clip"><path d="M248 0Q246 46 242 92Q230 140 204 150Q194 180 198 214Q220 252 228 292Q171 560 63 800Q191.5 836 320 822L320 822Q448.5 836 577 800Q469 560 412 292Q420 252 442 214Q446 180 436 150Q410 140 398 92Q394 46 392 0L360 0C358 60 344 112 320 112C296 112 282 60 280 0L248 0Z"/></clipPath>
+  
+  
+</defs>
+<g >
+  <path d="M248 0Q246 46 242 92Q230 140 204 150Q194 180 198 214Q220 252 228 292Q171 560 63 800Q191.5 836 320 822L320 822Q448.5 836 577 800Q469 560 412 292Q420 252 442 214Q446 180 436 150Q410 140 398 92Q394 46 392 0L360 0C358 60 344 112 320 112C296 112 282 60 280 0L248 0Z" fill="#e5aeb2"/>
+  <g clip-path="url(#dress-blush-clip)">
+    
+    <path d="M280 0C282 60 296 112 320 112C344 112 358 60 360 0" fill="none" stroke="#b3888b" stroke-width="9"/>
+    <path d="M228 292L412 292" stroke="#b3888b" stroke-width="9"/>
+    <path d="M228 304L412 304" stroke="#000" stroke-opacity=".18" stroke-width="2"/>
+    <path d="M290 150C284 200 280 250 284 290" stroke="#000" stroke-opacity=".12" stroke-width="3" fill="none"/>
+    <path d="M350 150C356 200 360 250 356 290" stroke="#000" stroke-opacity=".12" stroke-width="3" fill="none"/><path d="M250 310C169.609375 520 119.21875 700 119.21875 812" stroke="#000" stroke-opacity="0.1" stroke-width="14" fill="none" filter="url(#dress-blush-soft)"/><path d="M264 310C199.6875 520 159.375 700 159.375 812" stroke="#fff" stroke-opacity="0.09" stroke-width="12" fill="none" filter="url(#dress-blush-soft)"/><path d="M278 310C229.765625 520 199.53125 700 199.53125 812" stroke="#000" stroke-opacity="0.1" stroke-width="14" fill="none" filter="url(#dress-blush-soft)"/><path d="M292 310C259.84375 520 239.6875 700 239.6875 812" stroke="#fff" stroke-opacity="0.09" stroke-width="12" fill="none" filter="url(#dress-blush-soft)"/><path d="M306 310C289.921875 520 279.84375 700 279.84375 812" stroke="#000" stroke-opacity="0.1" stroke-width="14" fill="none" filter="url(#dress-blush-soft)"/><path d="M320 310C320 520 320 700 320 812" stroke="#fff" stroke-opacity="0.09" stroke-width="12" fill="none" filter="url(#dress-blush-soft)"/><path d="M334 310C350.078125 520 360.15625 700 360.15625 812" stroke="#000" stroke-opacity="0.1" stroke-width="14" fill="none" filter="url(#dress-blush-soft)"/><path d="M348 310C380.15625 520 400.3125 700 400.3125 812" stroke="#fff" stroke-opacity="0.09" stroke-width="12" fill="none" filter="url(#dress-blush-soft)"/><path d="M362 310C410.234375 520 440.46875 700 440.46875 812" stroke="#000" stroke-opacity="0.1" stroke-width="14" fill="none" filter="url(#dress-blush-soft)"/><path d="M376 310C440.3125 520 480.625 700 480.625 812" stroke="#fff" stroke-opacity="0.09" stroke-width="12" fill="none" filter="url(#dress-blush-soft)"/><path d="M390 310C470.390625 520 520.78125 700 520.78125 812" stroke="#000" stroke-opacity="0.1" stroke-width="14" fill="none" filter="url(#dress-blush-soft)"/><path d="M73 786L567 786" stroke="#000" stroke-opacity=".2" stroke-width="2" stroke-dasharray="6 4"/>
+    <rect width="640" height="860" fill="url(#dress-blush-h)"/>
+    <rect width="640" height="860" fill="url(#dress-blush-v)"/>
+    <rect width="640" height="860" filter="url(#dress-blush-grain)" opacity=".5"/>
+    
+  </g>
+  <path d="M248 0Q246 46 242 92Q230 140 204 150Q194 180 198 214Q220 252 228 292Q171 560 63 800Q191.5 836 320 822L320 822Q448.5 836 577 800Q469 560 412 292Q420 252 442 214Q446 180 436 150Q410 140 398 92Q394 46 392 0L360 0C358 60 344 112 320 112C296 112 282 60 280 0L248 0Z" fill="none" stroke="#7e6062" stroke-opacity=".55" stroke-width="2.2" stroke-linejoin="round"/>
+</g>
+</svg>

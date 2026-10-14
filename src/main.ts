@@ -1,59 +1,67 @@
 import './style.css';
 import {
-  CATEGORIES,
-  CATEGORY_ORDER,
-  PRESETS,
-  applyPreset,
-  defaultLook,
-  presetColors,
-  productOf,
-  sanitizeLook,
-  clearedLook,
-  type CategoryId,
-  type Look,
+  BUILT_IN,
+  KIND_LABEL,
+  KIND_ORDER,
+  defaultFit,
+  emptyOutfit,
+  wear,
+  type Fit,
+  type GarmentDef,
+  type Outfit,
 } from './catalog';
-import { FaceSmoother, toPoints, type FacePts } from './face';
-import { renderLook, resetMakeup } from './makeup';
-import { createTracker, type Tracker } from './tracker';
+import { buildBody, fitBody, PoseSmoother, type Body, type Pt33 } from './body';
+import { loadGarment, type LoadedGarment } from './garments';
+import { Renderer } from './gl';
+import { createPoseTracker, type Landmark, type PoseTracker } from './pose';
+import { poseMesh, type Kind } from './rig';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
 const view = $<HTMLCanvasElement>('view');
-// willReadFrequently: the makeup renderers edit pixels directly, so keep the frame CPU-readable
-const ctx = view.getContext('2d', { alpha: false, willReadFrequently: true })!;
 const video = $<HTMLVideoElement>('cam');
 const statusEl = $('status');
 const intro = $('intro');
 const introError = $('intro-error');
 const fileInput = $<HTMLInputElement>('file');
 
-// ---------- look & settings ----------
-type Tab = CategoryId | 'looks';
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'looks', label: 'Looks' },
-  ...CATEGORY_ORDER.map((id) => ({ id: id as Tab, label: CATEGORIES[id].label })),
-];
-const STORE_KEY = 'makeup-tryon:v2';
-const OLD_STORE_KEY = 'lipstick-tryon:v1';
-
-let look: Look = defaultLook();
-let tab: Tab = 'lips';
+let renderer: Renderer | null = null;
+let glError = '';
 try {
-  const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as { look?: unknown; tab?: string } | null;
+  renderer = new Renderer(view);
+} catch (err) {
+  glError = err instanceof Error ? err.message : 'WebGL is not available';
+}
+
+// ---------- catalogue, outfit and settings ----------
+const garments: GarmentDef[] = [...BUILT_IN];
+const byId = (id: string | null) => (id ? garments.find((g) => g.id === id) : undefined);
+
+type Tab = Kind;
+const STORE_KEY = 'clothes-tryon:v1';
+
+let outfit: Outfit = emptyOutfit();
+let fit: Record<Kind, Fit> = defaultFit();
+let tab: Tab = 'top';
+try {
+  const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as { outfit?: Outfit; fit?: Record<Kind, Fit>; tab?: string } | null;
   if (saved) {
-    look = sanitizeLook(saved.look);
-    if (TABS.some((t) => t.id === saved.tab)) tab = saved.tab as Tab;
+    for (const k of KIND_ORDER) {
+      const id = saved.outfit?.[k];
+      if (typeof id === 'string' && byId(id)?.kind === k) outfit[k] = id;
+      const f = saved.fit?.[k];
+      if (f && Number.isFinite(f.size) && Number.isFinite(f.dy)) fit[k] = { size: Math.min(1.3, Math.max(0.8, f.size)), dy: Math.min(0.3, Math.max(-0.3, f.dy)) };
+    }
+    if (KIND_ORDER.includes(saved.tab as Kind)) tab = saved.tab as Kind;
   } else {
-    // carry over the lipstick choice from the first version of the app
-    const old = JSON.parse(localStorage.getItem(OLD_STORE_KEY) ?? 'null') as { shadeId?: string; finish?: string; intensity?: number } | null;
-    if (old) look = sanitizeLook({ lips: { productId: old.shadeId, finish: old.finish, intensity: old.intensity } });
+    outfit = wear(wear(outfit, 'top', 'tee-red'), 'bottom', 'jeans-blue');
   }
 } catch {
   /* storage unavailable (private mode) – defaults are fine */
 }
 function persist() {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify({ look, tab }));
+    localStorage.setItem(STORE_KEY, JSON.stringify({ outfit, fit, tab }));
   } catch {
     /* ignore */
   }
@@ -65,196 +73,162 @@ let mode: Mode = 'idle';
 let stream: MediaStream | null = null;
 let facing: 'user' | 'environment' = 'user';
 let mirrored = true;
-let tracker: Tracker | null = null;
+let tracker: PoseTracker | null = null;
 let trackerFailed = false;
-const trackerReady = createTracker()
+const trackerReady = createPoseTracker()
   .then((t) => {
     tracker = t;
     return t;
   })
   .catch((err) => {
-    console.error('Face tracking failed to load', err);
+    console.error('Body tracking failed to load', err);
     trackerFailed = true;
     return null;
   });
 
-const smoother = new FaceSmoother();
-let livePts: FacePts | null = null;
-let lastFaceAt = 0;
+const smoother = new PoseSmoother();
+let liveBody: Body | null = null;
+let lastPoseAt = 0;
 let lastVideoTime = -1;
 let comparing = false;
-let photo: { canvas: HTMLCanvasElement; pts: FacePts | null } | null = null;
-let photoDirty = true;
+let photo: { canvas: HTMLCanvasElement; body: Body | null } | null = null;
+let dirty = true;
+
+// ---------- garment loading ----------
+const base = import.meta.env.BASE_URL;
+const resolveSrc = (src: string) => (/^(blob:|data:|https?:)/.test(src) ? src : `${base}${src}`);
+const loaded = new Map<string, LoadedGarment>();
+const loading = new Set<string>();
+
+function garmentFor(id: string): LoadedGarment | undefined {
+  const hit = loaded.get(id);
+  if (hit) return hit;
+  const def = byId(id);
+  if (!def || !renderer || loading.has(id)) return undefined;
+  loading.add(id);
+  loadGarment(renderer, def, resolveSrc)
+    .then((g) => {
+      loaded.set(id, g);
+      dirty = true;
+    })
+    .catch((err) => {
+      console.error(err);
+      setStatus('Could not load that garment');
+      setTimeout(() => setStatus(''), 3000);
+    })
+    .finally(() => {
+      loading.delete(id);
+      renderCards();
+    });
+  renderCards();
+  return undefined;
+}
 
 // ---------- UI ----------
 const tabsEl = $('tabs');
-const swatchesEl = $('swatches');
-const finishesEl = $('finishes');
+const cardsEl = $('cards');
 const controlsEl = $('controls');
-const intensityEl = $<HTMLInputElement>('intensity');
+const sizeEl = $<HTMLInputElement>('fit-size');
+const dyEl = $<HTMLInputElement>('fit-dy');
 const NONE = '__none';
 
+const noneSvg =
+  '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg>';
+
 function buildTabs() {
-  for (const t of TABS) {
+  for (const k of KIND_ORDER) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'tab';
-    b.dataset.id = t.id;
+    b.dataset.id = k;
     b.setAttribute('role', 'tab');
     b.innerHTML = `<i class="dot"></i><span></span>`;
-    b.querySelector('span')!.textContent = t.label;
+    b.querySelector('span')!.textContent = KIND_LABEL[k];
     b.addEventListener('click', () => {
-      tab = t.id;
+      tab = k;
       persist();
-      renderPanel();
+      renderCards();
+      syncUI(true);
     });
     tabsEl.appendChild(b);
   }
 }
 
-const noneSvg =
-  '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M6.5 17.5l11-11"/></svg>';
+function renderCards() {
+  cardsEl.textContent = '';
+  const none = document.createElement('button');
+  none.type = 'button';
+  none.className = 'card none';
+  none.dataset.id = NONE;
+  none.setAttribute('role', 'radio');
+  none.setAttribute('aria-label', `No ${KIND_LABEL[tab].toLowerCase()}`);
+  none.innerHTML = `${noneSvg}<span>None</span>`;
+  none.addEventListener('click', () => choose(null));
+  cardsEl.appendChild(none);
 
-function renderPanel() {
-  swatchesEl.textContent = '';
-  finishesEl.textContent = '';
-  swatchesEl.scrollLeft = 0;
-
-  if (tab === 'looks') {
-    swatchesEl.className = 'swatches presets';
-    swatchesEl.setAttribute('role', 'group');
-    swatchesEl.setAttribute('aria-label', 'Ready-made looks');
-    controlsEl.hidden = true;
-
-    const clear = document.createElement('button');
-    clear.type = 'button';
-    clear.className = 'preset';
-    clear.dataset.id = NONE;
-    clear.innerHTML = `<span class="chip none">${noneSvg}</span><span class="name">Clear all</span>`;
-    clear.addEventListener('click', () => setLook(clearedLook()));
-    swatchesEl.appendChild(clear);
-
-    for (const preset of PRESETS) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'preset';
-      b.dataset.id = preset.id;
-      const dots = presetColors(preset)
-        .map((hex) => `<i style="background:${hex}"></i>`)
-        .join('');
-      b.innerHTML = `<span class="chip">${dots}</span><span class="name"></span>`;
-      b.querySelector('.name')!.textContent = preset.name;
-      b.addEventListener('click', () => setLook(applyPreset(preset)));
-      swatchesEl.appendChild(b);
-    }
-  } else {
-    const cat = CATEGORIES[tab];
-    swatchesEl.className = 'swatches';
-    swatchesEl.setAttribute('role', 'radiogroup');
-    swatchesEl.setAttribute('aria-label', `${cat.label} shade`);
-    controlsEl.hidden = false;
-
-    const none = document.createElement('button');
-    none.type = 'button';
-    none.className = 'swatch none';
-    none.dataset.id = NONE;
-    none.setAttribute('role', 'radio');
-    none.setAttribute('aria-label', `No ${cat.label.toLowerCase()}`);
-    none.innerHTML = noneSvg;
-    none.addEventListener('click', () => selectProduct(null));
-    swatchesEl.appendChild(none);
-
-    for (const product of cat.products) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'swatch';
-      b.dataset.id = product.id;
-      b.style.background = product.hex;
-      b.setAttribute('role', 'radio');
-      b.setAttribute('aria-label', `${product.name}, ${product.family}`);
-      b.addEventListener('click', () => selectProduct(product.id));
-      swatchesEl.appendChild(b);
-    }
-
-    finishesEl.hidden = cat.finishes.length < 2;
-    finishesEl.style.setProperty('--n', String(cat.finishes.length));
-    for (const f of cat.finishes) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.dataset.id = f.id;
-      b.textContent = f.label;
-      b.setAttribute('role', 'radio');
-      b.addEventListener('click', () => {
-        look[tab as CategoryId].finish = f.id;
-        persist();
-        syncUI();
-      });
-      finishesEl.appendChild(b);
-    }
+  for (const def of garments.filter((g) => g.kind === tab)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'card';
+    b.dataset.id = def.id;
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-label', def.name);
+    const img = document.createElement('img');
+    img.src = resolveSrc(def.src);
+    img.alt = '';
+    img.loading = 'lazy';
+    b.appendChild(img);
+    if (loading.has(def.id)) b.insertAdjacentHTML('beforeend', '<span class="busy">…</span>');
+    b.addEventListener('click', () => choose(def.id));
+    cardsEl.appendChild(b);
   }
+  syncUI(false);
+}
+
+function choose(id: string | null) {
+  outfit = wear(outfit, tab, id);
+  if (id) garmentFor(id);
+  persist();
   syncUI(true);
 }
 
-function syncUI(scroll = false) {
+function syncUI(scroll: boolean) {
   for (const el of tabsEl.children as Iterable<HTMLElement>) {
-    const id = el.dataset.id as Tab;
-    el.setAttribute('aria-selected', String(id === tab));
-    const dot = el.querySelector<HTMLElement>('.dot')!;
-    const product = id === 'looks' ? undefined : productOf(id, look[id]);
-    dot.style.background = product?.hex ?? '';
-    dot.classList.toggle('on', !!product);
+    const k = el.dataset.id as Kind;
+    el.setAttribute('aria-selected', String(k === tab));
+    el.querySelector('.dot')!.classList.toggle('on', !!outfit[k]);
+    (el.querySelector('.dot') as HTMLElement).style.background = outfit[k] ? (byId(outfit[k])?.color ?? '#fff') : '';
   }
-
-  let accent = productOf('lips', look.lips)?.hex ?? '#c8102e';
-  if (tab === 'looks') {
-    $('shade-name').textContent = 'Looks';
-    $('shade-family').textContent = 'Full-face looks in one tap';
-  } else {
-    const cat = CATEGORIES[tab];
-    const layer = look[tab];
-    const product = productOf(tab, layer);
-    if (product) accent = product.hex;
-    $('shade-name').textContent = product ? product.name : `No ${cat.label.toLowerCase()}`;
-    $('shade-family').textContent = product ? product.family : 'Tap a shade to try it on';
-    for (const el of swatchesEl.children as Iterable<HTMLElement>) {
-      const on = el.dataset.id === (product ? product.id : NONE);
-      el.setAttribute('aria-checked', String(on));
-      if (on && scroll) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    }
-    for (const el of finishesEl.children as Iterable<HTMLElement>) {
-      el.setAttribute('aria-checked', String(el.dataset.id === layer.finish));
-    }
-    intensityEl.value = String(layer.intensity);
-    intensityEl.disabled = !product;
-    controlsEl.classList.toggle('disabled', !product);
+  const def = byId(outfit[tab]);
+  $('item-name').textContent = def ? def.name : `No ${KIND_LABEL[tab].toLowerCase().replace(/s$/, '')}`;
+  $('item-sub').textContent = def ? (def.custom ? 'Yours' : '') : 'Tap one to try it on';
+  for (const el of cardsEl.children as Iterable<HTMLElement>) {
+    const on = el.dataset.id === (def ? def.id : NONE);
+    el.setAttribute('aria-checked', String(on));
+    if (on && scroll) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }
-  document.documentElement.style.setProperty('--accent', accent);
-  photoDirty = true;
+  const f = fit[tab];
+  sizeEl.value = String(Math.round(f.size * 100));
+  dyEl.value = String(Math.round(f.dy * 100));
+  controlsEl.classList.toggle('disabled', !def);
+  sizeEl.disabled = dyEl.disabled = !def;
+  dirty = true;
 }
 
-function selectProduct(id: string | null) {
-  const layer = look[tab as CategoryId];
-  layer.productId = id;
-  if (id && layer.intensity === 0) layer.intensity = 60;
+sizeEl.addEventListener('input', () => {
+  fit[tab].size = Number(sizeEl.value) / 100;
   persist();
-  syncUI(true);
-}
-
-function setLook(next: Look) {
-  look = next;
+  dirty = true;
+});
+dyEl.addEventListener('input', () => {
+  fit[tab].dy = Number(dyEl.value) / 100;
   persist();
-  syncUI();
-}
-
-intensityEl.addEventListener('input', () => {
-  if (tab === 'looks') return;
-  look[tab].intensity = Number(intensityEl.value);
-  persist();
-  photoDirty = true;
+  dirty = true;
 });
 
 buildTabs();
-renderPanel();
+renderCards();
+for (const k of KIND_ORDER) if (outfit[k]) garmentFor(outfit[k]!);
 
 // ---------- status pill ----------
 let statusText = '';
@@ -283,6 +257,7 @@ function cameraErrorMessage(err: unknown): string {
 }
 
 async function startCamera(): Promise<string | null> {
+  if (glError) return `Your browser can't show the try-on (${glError}).`;
   if (!navigator.mediaDevices?.getUserMedia) {
     return window.isSecureContext ? 'This browser does not support camera access.' : cameraErrorMessage(null);
   }
@@ -305,9 +280,8 @@ async function startCamera(): Promise<string | null> {
   mode = 'camera';
   photo = null;
   lastVideoTime = -1;
-  livePts = null;
+  liveBody = null;
   smoother.reset();
-  resetMakeup();
   syncMode();
   return null;
 }
@@ -316,6 +290,7 @@ function syncMode() {
   view.classList.toggle('mirror', mode === 'camera' && mirrored);
   $('mode-label').textContent = mode === 'photo' ? 'Camera' : 'Photo';
   $('btn-flip').hidden = mode === 'photo';
+  dirty = true;
 }
 
 async function enterCamera(fromIntro: boolean) {
@@ -345,7 +320,7 @@ $('btn-flip').addEventListener('click', () => {
 // ---------- photo mode ----------
 const MAX_PHOTO_SIDE = 1280;
 
-function loadImage(file: File): Promise<HTMLImageElement> {
+function loadFile(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -361,10 +336,16 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
+const rawPts = (lm: Landmark[], w: number, h: number): Pt33[] => lm.map((p) => ({ x: p.x * w, y: p.y * h, v: p.visibility ?? 1 }));
+
 async function openPhoto(file: File) {
-  setStatus('Finding your face…');
+  if (glError) {
+    setStatus(`Your browser can't show the try-on (${glError}).`);
+    return;
+  }
+  setStatus('Finding your body…');
   try {
-    const img = await loadImage(file);
+    const img = await loadFile(file);
     const scale = Math.min(1, MAX_PHOTO_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(img.naturalWidth * scale);
@@ -372,17 +353,17 @@ async function openPhoto(file: File) {
     canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
 
     const t = await trackerReady;
-    if (!t) throw new Error('Face tracking is not available');
+    if (!t) throw new Error('Body tracking is not available');
     const lm = await t.detectImage(canvas);
-    resetMakeup();
-    photo = { canvas, pts: lm ? toPoints(lm, canvas.width, canvas.height) : null };
+    const body = lm ? buildBody(rawPts(lm, canvas.width, canvas.height), canvas.height) : null;
+    photo = { canvas, body };
 
     stopStream();
     mode = 'photo';
-    photoDirty = true;
+    dirty = true;
     intro.hidden = true;
     syncMode();
-    setStatus(photo.pts ? '' : 'No face found in that photo. Try a clearer, front-facing one.');
+    setStatus(body ? '' : 'No body found in that photo. Try one where your shoulders are visible.');
   } catch (err) {
     setStatus(err instanceof Error ? err.message : 'Could not open that photo');
     setTimeout(() => setStatus(''), 5000);
@@ -400,12 +381,12 @@ $('btn-mode').addEventListener('click', () => {
   else fileInput.click();
 });
 
-// ---------- compare (hold to see your bare face) ----------
+// ---------- compare (hold to see yourself without the clothes) ----------
 const compareBtn = $('btn-compare');
 const setCompare = (on: boolean) => {
   comparing = on;
   compareBtn.classList.toggle('active', on);
-  photoDirty = true;
+  dirty = true;
 };
 compareBtn.addEventListener('pointerdown', (e) => {
   compareBtn.setPointerCapture(e.pointerId);
@@ -416,55 +397,210 @@ for (const type of ['pointerup', 'pointercancel', 'lostpointercapture'] as const
 }
 compareBtn.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// ---------- render loop ----------
-function fitCanvas(w: number, h: number) {
-  if (view.width !== w || view.height !== h) {
-    view.width = w;
-    view.height = h;
+// ---------- lighting match ----------
+// The scene's overall brightness and colour cast, and the average brightness under the torso (the
+// shader compares the camera image to it to borrow broad shading).
+const sceneCanvas = document.createElement('canvas');
+sceneCanvas.width = sceneCanvas.height = 16;
+const sceneCtx = sceneCanvas.getContext('2d', { willReadFrequently: true })!;
+const torsoCanvas = document.createElement('canvas');
+torsoCanvas.width = torsoCanvas.height = 12;
+const torsoCtx = torsoCanvas.getContext('2d', { willReadFrequently: true })!;
+let light = 1;
+let tint: [number, number, number] = [1, 1, 1];
+let shadeRef = 0.4;
+let lightTick = 0;
+function updateLight(source: CanvasImageSource, w: number, h: number, body: Body | null, immediate = false) {
+  const tick = lightTick++;
+  if (immediate || tick % 10 === 0) {
+    sceneCtx.drawImage(source, 0, 0, 16, 16);
+    const d = sceneCtx.getImageData(0, 0, 16, 16).data;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      r += d[i];
+      g += d[i + 1];
+      b += d[i + 2];
+    }
+    const n = 256 * 255;
+    r /= n;
+    g /= n;
+    b /= n;
+    const mean = 0.299 * r + 0.587 * g + 0.114 * b;
+    const target = Math.min(1.08, Math.max(0.68, 0.55 + mean * 0.8));
+    // white balance: half-strength, so a warm room warms the garment without turning it orange
+    const k = (c: number) => Math.min(1.12, Math.max(0.88, 1 + 0.5 * (c / Math.max(mean, 0.02) - 1)));
+    const t: [number, number, number] = [k(r), k(g), k(b)];
+    const a = immediate ? 1 : 0.25;
+    light += (target - light) * a;
+    tint = [tint[0] + (t[0] - tint[0]) * a, tint[1] + (t[1] - tint[1]) * a, tint[2] + (t[2] - tint[2]) * a];
+  }
+  if (body && (immediate || tick % 3 === 0)) {
+    const xs = [body.sL.x, body.sR.x, body.hL.x, body.hR.x];
+    const ys = [body.sL.y, body.sR.y, body.hL.y, body.hR.y];
+    const x0 = Math.max(0, Math.min(...xs));
+    const x1 = Math.min(w, Math.max(...xs));
+    const y0 = Math.max(0, Math.min(...ys));
+    const y1 = Math.min(h, Math.max(...ys));
+    if (x1 - x0 > 8 && y1 - y0 > 8) {
+      torsoCtx.drawImage(source, x0, y0, x1 - x0, y1 - y0, 0, 0, 12, 12);
+      const d = torsoCtx.getImageData(0, 0, 12, 12).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      const l = sum / (144 * 255);
+      shadeRef = immediate ? l : shadeRef + (l - shadeRef) * 0.3;
+    }
   }
 }
 
-function drawMakeup(w: number, h: number, pts: FacePts | null, now: number) {
-  if (!pts || comparing) return;
-  renderLook(ctx, w, h, pts, look, now);
+// ---------- render ----------
+const NOISE = 0.03;
+const SHADE = 0.55;
+const stats = { frames: 0, detectMs: 0, renderMs: 0, detects: 0 };
+
+/** Garments to draw, back to front. */
+function layers(body: Body): { g: LoadedGarment; fit: Fit }[] {
+  const out: { g: LoadedGarment; fit: Fit }[] = [];
+  const order: Kind[] = outfit.dress ? ['dress'] : ['bottom', 'top'];
+  for (const k of order) {
+    const id = outfit[k];
+    if (!id) continue;
+    const g = garmentFor(id);
+    if (!g) continue;
+    // legs need the hips in view; otherwise the garment would float where there is no body
+    if (k === 'bottom' && !body.hipsTracked) continue;
+    out.push({ g, fit: fit[k] });
+  }
+  return out;
 }
 
-const sparkling = () => !!look.eyes.productId && look.eyes.finish === 'shimmer';
+function renderScene(source: TexImageSource, w: number, h: number, body: Body | null) {
+  const r = renderer!;
+  r.resize(w, h);
+  r.drawSource(source);
+  if (!body || comparing) return;
+  const items = layers(body);
+  if (!items.length) return;
+  r.beginGarments({ light, tint, shade: SHADE, shadeRef, noise: NOISE, head: body.head });
+  for (const { g, fit: f } of items) {
+    poseMesh(g.mesh, fitBody(body, f.size, f.dy), g.positions);
+    r.drawGarment(g.gpu, g.positions);
+  }
+}
+
+// ?debug=1 draws the tracked joints over the picture (for tuning garments)
+const debug = new URLSearchParams(location.search).has('debug');
+const overlay = $<HTMLCanvasElement>('joints-overlay');
+overlay.hidden = !debug;
+function drawDebug(w: number, h: number, body: Body | null) {
+  if (!debug) return;
+  if (overlay.width !== w || overlay.height !== h) {
+    overlay.width = w;
+    overlay.height = h;
+  }
+  overlay.classList.toggle('mirror', mode === 'camera' && mirrored);
+  const g = overlay.getContext('2d')!;
+  g.clearRect(0, 0, w, h);
+  if (!body) return;
+  const dot = (p: { x: number; y: number }, c: string) => {
+    g.fillStyle = c;
+    g.beginPath();
+    g.arc(p.x, p.y, Math.max(3, h / 200), 0, 7);
+    g.fill();
+  };
+  const line = (a: { x: number; y: number }, b: { x: number; y: number }, c: string) => {
+    g.strokeStyle = c;
+    g.lineWidth = Math.max(2, h / 400);
+    g.beginPath();
+    g.moveTo(a.x, a.y);
+    g.lineTo(b.x, b.y);
+    g.stroke();
+  };
+  line(body.sL, body.sR, '#0f0');
+  line(body.hL, body.hR, '#0ff');
+  line(body.sL, body.hL, '#ff0');
+  line(body.sR, body.hR, '#ff0');
+  line(body.sL, body.eL, '#f0f');
+  line(body.eL, body.wL, '#f0f');
+  line(body.sR, body.eR, '#f0f');
+  line(body.eR, body.wR, '#f0f');
+  line(body.hL, body.kL, '#fa0');
+  line(body.kL, body.aL, '#fa0');
+  line(body.hR, body.kR, '#fa0');
+  line(body.kR, body.aR, '#fa0');
+  for (const p of [body.sL, body.sR, body.eL, body.eR, body.wL, body.wR, body.hL, body.hR, body.kL, body.kR, body.aL, body.aR]) dot(p, '#fff');
+  if (body.head) {
+    g.strokeStyle = '#f66';
+    g.lineWidth = 2;
+    g.beginPath();
+    g.ellipse(body.head.c.x, body.head.c.y, body.head.rx, body.head.ry, Math.atan2(body.head.ax.y, body.head.ax.x), 0, 7);
+    g.stroke();
+  }
+}
+
+function renderCurrent(): boolean {
+  if (!renderer) return false;
+  if (mode === 'camera') {
+    if (video.readyState < 2 || !video.videoWidth) return false;
+    updateLight(video, video.videoWidth, video.videoHeight, liveBody);
+    renderScene(video, video.videoWidth, video.videoHeight, liveBody);
+    drawDebug(video.videoWidth, video.videoHeight, liveBody);
+    return true;
+  }
+  if (mode === 'photo' && photo) {
+    updateLight(photo.canvas, photo.canvas.width, photo.canvas.height, photo.body, true);
+    renderScene(photo.canvas, photo.canvas.width, photo.canvas.height, photo.body);
+    drawDebug(photo.canvas.width, photo.canvas.height, photo.body);
+    return true;
+  }
+  return false;
+}
 
 function frame(now: number) {
   requestAnimationFrame(frame);
+  if (!renderer) return;
 
   if (mode === 'camera') {
     if (video.readyState < 2 || !video.videoWidth) return;
     const w = video.videoWidth;
     const h = video.videoHeight;
-    fitCanvas(w, h);
-    ctx.drawImage(video, 0, 0, w, h);
-
-    if (tracker && video.currentTime !== lastVideoTime) {
+    const fresh = video.currentTime !== lastVideoTime;
+    if (fresh && tracker) {
       lastVideoTime = video.currentTime;
+      const t0 = performance.now();
       const lm = tracker.detectVideo(video);
+      stats.detectMs += performance.now() - t0;
+      stats.detects++;
       if (lm) {
-        livePts = smoother.update(lm, w, h);
-        lastFaceAt = now;
-      } else if (now - lastFaceAt > 250) {
-        livePts = null;
-        smoother.reset();
-        resetMakeup();
+        liveBody = buildBody(smoother.update(lm, w, h, now / 1000), h);
+        if (liveBody) lastPoseAt = now;
       }
+      if (!lm || !liveBody) {
+        if (now - lastPoseAt > 350) {
+          liveBody = null;
+          smoother.reset();
+        }
+      }
+    } else if (fresh) {
+      lastVideoTime = video.currentTime;
     }
-    drawMakeup(w, h, livePts, now);
+    if (fresh || dirty) {
+      dirty = false;
+      const t0 = performance.now();
+      renderCurrent();
+      stats.renderMs += performance.now() - t0;
+      stats.frames++;
+    }
 
-    if (trackerFailed) setStatus('Face tracking could not load. Check your connection and reload.');
-    else if (!tracker) setStatus('Loading face tracking…');
-    else if (!livePts && now - lastFaceAt > 700) setStatus('Move your face into the frame');
+    if (trackerFailed) setStatus('Body tracking could not load. Check your connection and reload.');
+    else if (!tracker) setStatus('Loading body tracking…');
+    else if (!liveBody && now - lastPoseAt > 700) setStatus('Step back so your shoulders are in view');
+    else if (liveBody && outfit.bottom && !outfit.dress && !liveBody.hipsTracked) setStatus('Step back to see your hips and legs');
     else setStatus('');
-  } else if (mode === 'photo' && photo && (photoDirty || sparkling())) {
-    photoDirty = false;
-    const { canvas, pts } = photo;
-    fitCanvas(canvas.width, canvas.height);
-    ctx.drawImage(canvas, 0, 0);
-    drawMakeup(canvas.width, canvas.height, pts, now);
+  } else if (mode === 'photo' && photo && dirty) {
+    dirty = false;
+    renderCurrent();
   }
 }
 requestAnimationFrame(frame);
@@ -483,7 +619,9 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
 }
 
 async function capture() {
-  if (mode === 'idle' || !view.width) return;
+  if (mode === 'idle' || !renderer) return;
+  // draw and copy in the same task so the WebGL buffer is still valid
+  if (!renderCurrent() || !view.width) return;
   const out = document.createElement('canvas');
   out.width = view.width;
   out.height = view.height;
@@ -509,11 +647,11 @@ async function capture() {
 
 async function shareResult() {
   if (!resultBlob) return;
-  const name = 'makeup-look.jpg';
+  const name = 'my-outfit.jpg';
   const file = new File([resultBlob], name, { type: 'image/jpeg' });
   if (navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'My makeup look' });
+      await navigator.share({ files: [file], title: 'My outfit' });
       return;
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
@@ -536,6 +674,26 @@ $('btn-close').addEventListener('click', () => {
 // Offline-capable service worker (production builds only).
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {});
+    navigator.serviceWorker.register(`${base}sw.js`).catch(() => {});
   });
 }
+
+// Test hook for the browser-based checks (Playwright): lets a script pick garments and read state.
+(window as unknown as { __tryon: unknown }).__tryon = {
+  wear: (kind: Kind, id: string | null) => {
+    outfit = wear(outfit, kind, id);
+    if (id) garmentFor(id);
+    syncUI(false);
+  },
+  setFit: (kind: Kind, size: number, dy: number) => {
+    fit[kind] = { size, dy };
+    dirty = true;
+  },
+  get body() {
+    return mode === 'photo' ? photo?.body : liveBody;
+  },
+  get ready() {
+    return !!tracker;
+  },
+  stats,
+};

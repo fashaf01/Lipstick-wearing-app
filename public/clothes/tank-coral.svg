@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="500" viewBox="0 0 520 500">
+<defs>
+  <linearGradient id="tank-coral-v" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".16"/>
+    <stop offset=".45" stop-color="#fff" stop-opacity="0"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".16"/>
+  </linearGradient>
+  <linearGradient id="tank-coral-h" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#000" stop-opacity=".30"/>
+    <stop offset=".16" stop-color="#000" stop-opacity=".04"/>
+    <stop offset=".42" stop-color="#fff" stop-opacity=".09"/>
+    <stop offset=".58" stop-color="#fff" stop-opacity=".05"/>
+    <stop offset=".84" stop-color="#000" stop-opacity=".05"/>
+    <stop offset="1" stop-color="#000" stop-opacity=".30"/>
+  </linearGradient>
+  <radialGradient id="tank-coral-pit" cx=".5" cy=".5" r=".5">
+    <stop offset="0" stop-color="#000" stop-opacity=".34"/>
+    <stop offset="1" stop-color="#000" stop-opacity="0"/>
+  </radialGradient>
+  <filter id="tank-coral-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3.2"/></filter>
+  <filter id="tank-coral-grain" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="4" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .55 -.18"/>
+  </filter>
+  <clipPath id="tank-coral-clip"><path d="M162 0Q160 50 156 96Q150 150 130 160L108 200L110 478Q180 489 260 487L260 487Q340 489 410 478L412 200L390 160Q370 150 364 96Q360 50 358 0L322 0C320 70 296 125 260 125C224 125 200 70 198 0Z"/></clipPath>
+  
+  
+</defs>
+<g >
+  <path d="M162 0Q160 50 156 96Q150 150 130 160L108 200L110 478Q180 489 260 487L260 487Q340 489 410 478L412 200L390 160Q370 150 364 96Q360 50 358 0L322 0C320 70 296 125 260 125C224 125 200 70 198 0Z" fill="#e0705f"/>
+  <g clip-path="url(#tank-coral-clip)">
+    
+    <path d="M198 0C200 70 224 125 260 125C296 125 320 70 322 0" fill="none" stroke="#c16052" stroke-width="12"/>
+    <path d="M160 10C156 90 132 156 110 198" fill="none" stroke="#c16052" stroke-width="12"/>
+    <path d="M360 10C364 90 388 156 410 198" fill="none" stroke="#c16052" stroke-width="12"/>
+    <path d="M110 466L410 466" stroke="#000" stroke-opacity=".2" stroke-width="2" stroke-dasharray="6 4"/>
+    <path d="M310 250C330 320 346 380 342 450" stroke="#000" stroke-opacity=".09" stroke-width="12" fill="none" filter="url(#tank-coral-soft)"/>
+    <path d="M180 230C164 300 156 380 166 450" stroke="#fff" stroke-opacity=".11" stroke-width="12" fill="none" filter="url(#tank-coral-soft)"/>
+    <rect width="520" height="500" fill="url(#tank-coral-h)"/>
+    <rect width="520" height="500" fill="url(#tank-coral-v)"/>
+    <rect width="520" height="500" filter="url(#tank-coral-grain)" opacity=".5"/>
+    
+  </g>
+  <path d="M162 0Q160 50 156 96Q150 150 130 160L108 200L110 478Q180 489 260 487L260 487Q340 489 410 478L412 200L390 160Q370 150 364 96Q360 50 358 0L322 0C320 70 296 125 260 125C224 125 200 70 198 0Z" fill="none" stroke="#7b3e34" stroke-opacity=".55" stroke-width="2.2" stroke-linejoin="round"/>
+</g>
+</svg>
